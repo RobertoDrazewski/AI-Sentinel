@@ -15,10 +15,15 @@ def register(data: UserRegister, session: Session = Depends(get_session)):
     if existing:
         raise HTTPException(status_code=400, detail="Ese email ya está registrado")
 
+    # El primer usuario que se registra en una instalación nueva es el dueño de esa
+    # instalación -- queda como admin automáticamente, sin tener que tocar nada a mano.
+    is_first_user = session.exec(select(User)).first() is None
+
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
         business_name=data.business_name,
+        role="admin" if is_first_user else "cliente",
     )
     session.add(user)
     session.commit()

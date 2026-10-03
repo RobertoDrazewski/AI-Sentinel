@@ -6,6 +6,7 @@ interface UserOut {
   email: string;
   business_name?: string;
   plan_status: string;
+  role: string;
 }
 
 interface AuthState {

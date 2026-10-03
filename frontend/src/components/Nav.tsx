@@ -45,6 +45,11 @@ export default function Nav() {
         <NavLink to="/billing" className={linkClass}>
           Suscripción
         </NavLink>
+        {user.role === "admin" && (
+          <NavLink to="/admin" className={linkClass}>
+            Admin
+          </NavLink>
+        )}
       </div>
     </nav>
   );

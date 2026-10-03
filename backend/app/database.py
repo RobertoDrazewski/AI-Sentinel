@@ -12,14 +12,27 @@ def _migrate_existing_tables() -> None:
     base sqlite que Roberto ya viene usando) y le agregamos una columna nueva al modelo,
     create_all() no la agrega sola. Esto chequea y agrega las columnas que falten."""
     inspector = inspect(engine)
-    if "zone" not in inspector.get_table_names():
-        return
-    existing_cols = {c["name"] for c in inspector.get_columns("zone")}
-    with engine.begin() as conn:
-        if "vehicle_stop_seconds" not in existing_cols:
-            conn.execute(text("ALTER TABLE zone ADD COLUMN vehicle_stop_seconds INTEGER DEFAULT 60"))
-        if "blocks_exit" not in existing_cols:
-            conn.execute(text("ALTER TABLE zone ADD COLUMN blocks_exit BOOLEAN DEFAULT 0"))
+    table_names = inspector.get_table_names()
+
+    if "zone" in table_names:
+        existing_cols = {c["name"] for c in inspector.get_columns("zone")}
+        with engine.begin() as conn:
+            if "vehicle_stop_seconds" not in existing_cols:
+                conn.execute(text("ALTER TABLE zone ADD COLUMN vehicle_stop_seconds INTEGER DEFAULT 60"))
+            if "blocks_exit" not in existing_cols:
+                conn.execute(text("ALTER TABLE zone ADD COLUMN blocks_exit BOOLEAN DEFAULT 0"))
+
+    if "user" in table_names:
+        existing_user_cols = {c["name"] for c in inspector.get_columns("user")}
+        if "role" not in existing_user_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE user ADD COLUMN role VARCHAR DEFAULT 'cliente'"))
+                # Primera vez que agregamos esta columna: el usuario más antiguo de la
+                # instalación (normalmente el único, el dueño) pasa a admin solo, para
+                # no dejar la instalación sin nadie que pueda ver "Admin".
+                conn.execute(
+                    text("UPDATE user SET role = 'admin' WHERE id = (SELECT MIN(id) FROM user)")
+                )
 
 
 def init_db() -> None:

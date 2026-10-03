@@ -9,6 +9,7 @@ import Alerts from "./pages/Alerts";
 import Billing from "./pages/Billing";
 import Onboarding from "./pages/Onboarding";
 import CameraSettings from "./pages/CameraSettings";
+import Admin from "./pages/Admin";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -62,6 +63,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <CameraSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Admin />
             </ProtectedRoute>
           }
         />

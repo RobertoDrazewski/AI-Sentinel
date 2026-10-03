@@ -14,6 +14,10 @@ class User(SQLModel, table=True):
     business_name: Optional[str] = None
     created_at: datetime = Field(default_factory=utcnow)
     plan_status: str = Field(default="trial")  # trial | active | past_due | cancelled
+    # El primer usuario que se registra en una instalación queda como "admin"
+    # automáticamente (ver auth.py y database.py) -- es el dueño de esa instalación
+    # y puede ver la pestaña "Admin" con el control de todas las cuentas/suscripciones.
+    role: str = Field(default="cliente")  # cliente | admin
 
 
 class Camera(SQLModel, table=True):
@@ -31,13 +35,17 @@ class Zone(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     camera_id: int = Field(foreign_key="camera.id", index=True)
     name: str
-    kind: str = Field(default="custom")  # reja | calle | custom
+    kind: str = Field(default="custom")  # reja | calle | custom | timbre
     # Polígono en coordenadas relativas 0-1 (x,y) para que sea independiente de la resolución.
     # Se guarda como JSON string: "[[x1,y1],[x2,y2],...]"
     polygon_json: str
     loiter_seconds: int = Field(default=5)
     detect_vehicles: bool = Field(default=False)
     detect_people: bool = Field(default=True)
+    # Activa el detector de movimiento por flujo óptico sobre la zona. Pensado
+    # originalmente para "manipulación de reja", pero se reutiliza tal cual para
+    # zonas "timbre" (una mano/brazo que cruza esa zona chica = tocaron el timbre).
+    # Qué mensaje/alerta dispara depende de zone.kind, no de este flag.
     detect_gate_tamper: bool = Field(default=False)
     # Cuántos segundos tiene que estar detenido un vehículo en esta zona para avisar
     # (ej: 60 = "si se queda parqueado más de 1 minuto"). Antes era un valor fijo de
@@ -93,3 +101,18 @@ class Subscription(SQLModel, table=True):
     status: str = Field(default="pendiente")  # pendiente | activa | vencida | cancelada
     amount_ars: float = Field(default=30000)
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class Payment(SQLModel, table=True):
+    """Un registro por cada pago mensual aprobado (vía webhook de Mercado Pago, o vía
+    /simulate-payment en desarrollo). A diferencia de Subscription (que sólo guarda el
+    estado ACTUAL), esto es el historial completo -- lo que el cliente ve en "Mi cuenta"
+    como "pagos de este mes" y lo que usamos para calcular la próxima fecha de vencimiento
+    (último pago + 1 mes)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    mp_payment_id: Optional[str] = Field(default=None, index=True)
+    amount_ars: float
+    status: str = Field(default="aprobado")  # aprobado | rechazado
+    paid_at: datetime = Field(default_factory=utcnow)

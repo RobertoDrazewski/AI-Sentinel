@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session, select
 
@@ -5,8 +7,9 @@ from app.auth import get_current_user
 from app.config import settings
 from app.database import get_session
 from app.integrations.mercadopago_client import create_subscription_preference, get_sdk
-from app.models import Subscription, User
-from app.schemas import SubscriptionOut
+from app.models import Alert, Payment, Subscription, User
+from app.schemas import AccountSummaryOut, PaymentOut, SubscriptionOut
+from app.utils import add_one_month
 
 router = APIRouter(prefix="/api/subscription", tags=["subscription"])
 
@@ -19,6 +22,19 @@ def _get_or_create(session: Session, user_id: int) -> Subscription:
         session.commit()
         session.refresh(sub)
     return sub
+
+
+def _record_payment(session: Session, user_id: int, amount_ars: float, mp_payment_id: str | None) -> None:
+    """Guarda un pago en el historial, salvo que ya lo hayamos registrado antes (Mercado
+    Pago puede reenviar el mismo webhook más de una vez)."""
+    if mp_payment_id:
+        existing = session.exec(
+            select(Payment).where(Payment.mp_payment_id == mp_payment_id)
+        ).first()
+        if existing:
+            return
+    session.add(Payment(user_id=user_id, amount_ars=amount_ars, mp_payment_id=mp_payment_id, status="aprobado"))
+    session.commit()
 
 
 @router.get("", response_model=SubscriptionOut)
@@ -70,6 +86,9 @@ async def mp_webhook(request: Request, session: Session = Depends(get_session)):
             sub.status = "activa" if status_mp == "approved" else "pendiente"
             session.add(sub)
             session.commit()
+            if status_mp == "approved":
+                amount = payment_info.get("transaction_amount") or sub.amount_ars
+                _record_payment(session, sub.user_id, amount, str(payment_id))
 
     return {"ok": True}
 
@@ -85,4 +104,53 @@ def simulate_payment(
     sub.status = "activa"
     session.add(sub)
     session.commit()
+    _record_payment(session, current_user.id, sub.amount_ars, None)
     return {"ok": True, "status": sub.status}
+
+
+@router.get("/summary", response_model=AccountSummaryOut)
+def get_account_summary(
+    session: Session = Depends(get_session), current_user: User = Depends(get_current_user)
+):
+    """Para la pantalla "Mi cuenta": estado de la suscripción, los pagos de este mes,
+    cuándo vence la próxima cuota, y un resumen de uso del mes (caras reconocidas,
+    alertas críticas) para que el cliente vea que lo que paga se está usando."""
+    sub = _get_or_create(session, current_user.id)
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    payments_this_month = session.exec(
+        select(Payment)
+        .where(Payment.user_id == current_user.id)
+        .where(Payment.paid_at >= month_start)
+        .order_by(Payment.paid_at.desc())
+    ).all()
+
+    last_payment = session.exec(
+        select(Payment)
+        .where(Payment.user_id == current_user.id)
+        .order_by(Payment.paid_at.desc())
+    ).first()
+    next_due_date = add_one_month(last_payment.paid_at) if last_payment else None
+
+    alerts_query = select(Alert).where(Alert.user_id == current_user.id).where(
+        Alert.created_at >= month_start
+    )
+    alerts_this_month = session.exec(alerts_query).all()
+    faces_recognized = sum(1 for a in alerts_this_month if a.type == "familiar")
+    critical_alerts = sum(1 for a in alerts_this_month if a.severity == "critical")
+
+    return AccountSummaryOut(
+        subscription=SubscriptionOut(
+            status=sub.status, amount_ars=sub.amount_ars, mp_preference_id=sub.mp_preference_id
+        ),
+        next_due_date=next_due_date,
+        payments_this_month=[
+            PaymentOut(amount_ars=p.amount_ars, status=p.status, paid_at=p.paid_at)
+            for p in payments_this_month
+        ],
+        faces_recognized_this_month=faces_recognized,
+        critical_alerts_this_month=critical_alerts,
+        total_alerts_this_month=len(alerts_this_month),
+    )

@@ -25,6 +25,7 @@ class UserOut(BaseModel):
     email: str
     business_name: Optional[str] = None
     plan_status: str
+    role: str = "cliente"
 
 
 # --- Cameras ---
@@ -77,6 +78,7 @@ class ZoneCreate(BaseModel):
 
 
 class ZoneUpdate(BaseModel):
+    name: Optional[str] = None
     loiter_seconds: Optional[int] = None
     detect_vehicles: Optional[bool] = None
     detect_people: Optional[bool] = None
@@ -143,3 +145,44 @@ class SubscriptionOut(BaseModel):
     status: str
     amount_ars: float
     mp_preference_id: Optional[str] = None
+
+
+class PaymentOut(BaseModel):
+    amount_ars: float
+    status: str
+    paid_at: datetime
+
+
+class AccountSummaryOut(BaseModel):
+    """Lo que el cliente ve en "Mi cuenta": su suscripción, el historial de pagos del
+    mes y un resumen de uso del mes (cuántas caras reconoció, si hubo alertas críticas)
+    para que quede claro el valor de lo que está pagando."""
+
+    subscription: SubscriptionOut
+    next_due_date: Optional[datetime] = None
+    payments_this_month: List[PaymentOut]
+    faces_recognized_this_month: int
+    critical_alerts_this_month: int
+    total_alerts_this_month: int
+
+
+# --- Admin ---
+class AdminUserSummary(BaseModel):
+    """Una fila de la pestaña "Admin": un vistazo de cada cuenta de esta instalación
+    (quién es, cómo está su suscripción, cuándo le vence, y si está usando el
+    sistema) para que Roberto pueda llevar el control sin entrar cuenta por cuenta."""
+
+    id: int
+    email: str
+    business_name: Optional[str] = None
+    role: str
+    created_at: datetime
+    subscription_status: str
+    amount_ars: float
+    next_due_date: Optional[datetime] = None
+    cameras_count: int
+    alerts_this_month: int
+
+
+class SubscriptionStatusUpdate(BaseModel):
+    status: str  # pendiente | activa | vencida | cancelada
