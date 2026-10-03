@@ -8,6 +8,13 @@ pydantic-settings==2.4.0
 email-validator==2.2.0
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
+# ultralytics instala PyTorch como dependencia. Sin esto, pip trae la build de
+# PyTorch con soporte CUDA (varios GB) aunque acá nunca corra GPU -- eso es lo
+# que normalmente hace fallar el build en Railway (se queda sin espacio/tiempo
+# de build). Esta línea hace que traiga la build liviana "sólo CPU" en su lugar.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
 ultralytics==8.2.103
 requests==2.32.3
 mercadopago==2.2.3

@@ -24,8 +24,10 @@ WORKDIR /app
 
 # Librerías de sistema que opencv-python-headless necesita en tiempo de
 # ejecución dentro de una imagen "slim" (si faltan, el import de cv2 explota).
+# curl hace falta en tiempo de BUILD para scripts/download_models.sh más abajo
+# -- "slim" no lo trae instalado de entrada.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libglib2.0-0 libgomp1 ffmpeg \
+      libglib2.0-0 libgomp1 ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./requirements.txt
