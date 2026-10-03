@@ -1,8 +1,24 @@
-// Si no se fija VITE_API_URL a mano, usamos el mismo host con el que se abrió la
-// página (window.location.hostname). Así funciona solo tanto en localhost como
-// desde el celular entrando por la IP de la compu en la red local (ej 192.168.x.x),
-// sin tener que reconfigurar nada por dispositivo.
-const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
+// Si no se fija VITE_API_URL a mano, hay dos casos:
+// - En desarrollo (Vite corriendo en :5173, o su "preview" en :4173) el backend
+//   corre aparte, en el puerto 8000 del mismo host -- así funciona solo tanto en
+//   localhost como desde el celular entrando por la IP de la compu en la red
+//   local o por Tailscale, sin tener que reconfigurar nada por dispositivo.
+// - En producción con un solo contenedor (Railway, por ejemplo: ver Dockerfile),
+//   el propio backend FastAPI sirve este frontend ya compilado desde el MISMO
+//   origen (mismo dominio, mismo puerto, HTTPS) -- ahí NO hay que agregarle
+//   ningún puerto, las rutas /api/* ya caen en el lugar correcto solas. Agregar
+//   ":8000" ahí apunta a un puerto que no existe desde afuera (y encima por
+//   http:// en una página https://), lo que da "Failed to fetch" en el login.
+function resolveApiUrl(): string {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  const { hostname, port } = window.location;
+  if (port === "5173" || port === "4173") {
+    return `http://${hostname}:8000`;
+  }
+  return "";
+}
+
+const API_URL = resolveApiUrl();
 
 function getToken(): string | null {
   return localStorage.getItem("centinela_token");

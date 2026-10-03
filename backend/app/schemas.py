@@ -26,6 +26,7 @@ class UserOut(BaseModel):
     business_name: Optional[str] = None
     plan_status: str
     role: str = "cliente"
+    trial_ends_at: Optional[datetime] = None
 
 
 # --- Cameras ---
@@ -186,3 +187,33 @@ class AdminUserSummary(BaseModel):
 
 class SubscriptionStatusUpdate(BaseModel):
     status: str  # pendiente | activa | vencida | cancelada
+
+
+# --- Agente local / licencia ---
+class AgentPairIn(BaseModel):
+    label: Optional[str] = None  # ej: "Mac de Roberto" -- nombre de la máquina
+
+
+class AgentPairOut(BaseModel):
+    """Se devuelve UNA sola vez, en el momento del pairing -- el agente la tiene
+    que guardar ahí mismo, porque después no se puede volver a consultar (sólo
+    mostramos la lista de dispositivos sin el token, por seguridad)."""
+
+    token: str
+    label: str
+    device_id: int
+
+
+class AgentDeviceOut(BaseModel):
+    id: int
+    label: str
+    created_at: datetime
+    last_seen_at: Optional[datetime] = None
+
+
+class LicenseStatusOut(BaseModel):
+    ai_enabled: bool
+    status: str  # admin | trial | activa | vencida | cancelada | pendiente
+    reason: str
+    trial_ends_at: Optional[datetime] = None
+    trial_active: bool

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import init_db
-from app.routers import admin, alerts, auth, cameras, faces, stream, subscription, telegram, zones
+from app.routers import admin, agent, alerts, auth, cameras, faces, stream, subscription, telegram, zones
 
 # Estas carpetas tienen que existir ANTES de montar StaticFiles más abajo (el mount se
 # evalúa al importar el módulo, antes de que corra el evento de startup).
@@ -21,9 +21,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_ORIGIN],
     # Además del origen configurado, permitimos cualquier IP de red local (celular
-    # conectado al mismo wifi entrando por http://192.168.x.x:5173, por ejemplo) en
-    # cualquier puerto. Es seguro para uso en red local de desarrollo/hogar.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}):\d+",
+    # conectado al mismo wifi entrando por http://192.168.x.x:5173, por ejemplo) y
+    # cualquier dirección/nombre de Tailscale (celular entrando de lejos por VPN
+    # personal, ej. http://100.x.x.x:5173 o http://tu-mac.tailXXXX.ts.net:5173) en
+    # cualquier puerto. Sigue siendo sólo redes privadas/VPN propia, nunca internet
+    # público en general.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}|[a-zA-Z0-9.-]+\.ts\.net):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,6 +46,7 @@ app.include_router(alerts.router)
 app.include_router(telegram.router)
 app.include_router(subscription.router)
 app.include_router(admin.router)
+app.include_router(agent.router)
 app.include_router(stream.router)
 
 # Fotos de rostros conocidos y snapshots de alertas servidas directo (quedan detrás

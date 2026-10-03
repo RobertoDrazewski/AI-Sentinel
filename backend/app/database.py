@@ -33,6 +33,29 @@ def _migrate_existing_tables() -> None:
                 conn.execute(
                     text("UPDATE user SET role = 'admin' WHERE id = (SELECT MIN(id) FROM user)")
                 )
+        if "trial_ends_at" not in existing_user_cols:
+            is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE user ADD COLUMN trial_ends_at TIMESTAMP"))
+                # Cuentas que ya existían antes de este campo: les damos 30 días de
+                # prueba a partir de ahora, para no cortarles el servicio de golpe con
+                # el deploy. Las cuentas nuevas ya nacen con esto (ver auth.py). La
+                # función de fecha cambia según el motor (SQLite local vs Postgres
+                # en la nube).
+                if is_sqlite:
+                    conn.execute(
+                        text(
+                            "UPDATE user SET trial_ends_at = datetime('now', '+30 days') "
+                            "WHERE trial_ends_at IS NULL"
+                        )
+                    )
+                else:
+                    conn.execute(
+                        text(
+                            "UPDATE user SET trial_ends_at = NOW() + INTERVAL '30 days' "
+                            "WHERE trial_ends_at IS NULL"
+                        )
+                    )
 
 
 def init_db() -> None:

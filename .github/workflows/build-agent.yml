@@ -1,0 +1,93 @@
+name: Compilar agente local (Windows + Mac)
+
+# Se dispara a mano desde la pestaña "Actions" de GitHub (botón "Run workflow") --
+# no corre solo en cada push, porque instalar PyTorch/OpenCV/YOLO en cada compilación
+# es pesado y no hace falta un build nuevo por cada cambio de código.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: ai-sentinel-agent-windows
+            pyinstaller_sep: ";"
+          - os: macos-latest # Apple Silicon (M1/M2/M3)
+            artifact_name: ai-sentinel-agent-mac-applesilicon
+            pyinstaller_sep: ":"
+          - os: macos-13 # Intel
+            artifact_name: ai-sentinel-agent-mac-intel
+            pyinstaller_sep: ":"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compilar el frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copiar el frontend compilado al backend (mismo esquema que el Dockerfile)
+        shell: bash
+        run: |
+          rm -rf backend/static_frontend
+          cp -r frontend/dist backend/static_frontend
+
+      - name: Instalar dependencias de Python
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Descargar modelos de reconocimiento facial (YuNet + SFace)
+        working-directory: backend
+        shell: bash
+        run: bash scripts/download_models.sh
+
+      - name: Descargar y ubicar el modelo YOLO (detección de objetos)
+        working-directory: backend
+        shell: bash
+        run: |
+          python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+          mv yolov8n.pt app/models_data/yolov8n.pt
+
+      - name: Empaquetar con PyInstaller
+        working-directory: backend
+        shell: bash
+        run: |
+          pyinstaller --onefile --name ai-sentinel-agent \
+            --add-data "app/models_data${{ matrix.pyinstaller_sep }}app/models_data" \
+            --add-data "static_frontend${{ matrix.pyinstaller_sep }}static_frontend" \
+            --collect-all ultralytics \
+            --collect-all cv2 \
+            --hidden-import app.routers.admin \
+            --hidden-import app.routers.agent \
+            --hidden-import app.routers.alerts \
+            --hidden-import app.routers.auth \
+            --hidden-import app.routers.cameras \
+            --hidden-import app.routers.faces \
+            --hidden-import app.routers.stream \
+            --hidden-import app.routers.subscription \
+            --hidden-import app.routers.telegram \
+            --hidden-import app.routers.zones \
+            agent_main.py
+
+      - name: Subir el resultado como artifact descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: backend/dist/
+          retention-days: 30
