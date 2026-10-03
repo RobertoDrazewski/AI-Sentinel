@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: #0f172a;
+}
+
+/* Resplandor suave y constante detrás del logo en el landing -- combina el
+   cian y el bronce de las dos mitades del ícono (AI Sentinel). */
+@keyframes sentinel-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 28px rgba(56, 189, 248, 0.55)) drop-shadow(0 0 55px rgba(217, 119, 6, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 42px rgba(56, 189, 248, 0.75)) drop-shadow(0 0 75px rgba(217, 119, 6, 0.5));
+  }
+}
+
+.animate-sentinel-glow {
+  animation: sentinel-glow 3.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sentinel-glow {
+    animation: none;
+    filter: drop-shadow(0 0 32px rgba(56, 189, 248, 0.6)) drop-shadow(0 0 60px rgba(217, 119, 6, 0.4));
+  }
+}

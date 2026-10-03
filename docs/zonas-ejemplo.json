@@ -1,0 +1,33 @@
+{
+  "_comentario": "Zonas de ejemplo para la cámara del porche, basadas en el encuadre que mandaste (reja/puerta en el centro-abajo, y el puente/calle donde estacionan en el cuadrante superior derecho). Son un punto de partida: las coordenadas son relativas (0 a 1) y conviene reajustarlas con el editor de zonas del paso 2 del wizard, dibujando sobre una foto real de tu cámara.",
+  "zonas": [
+    {
+      "name": "Reja / entrada",
+      "kind": "reja",
+      "polygon": [
+        { "x": 0.30, "y": 0.18 },
+        { "x": 0.62, "y": 0.18 },
+        { "x": 0.62, "y": 1.0 },
+        { "x": 0.30, "y": 1.0 }
+      ],
+      "loiter_seconds": 5,
+      "detect_people": true,
+      "detect_vehicles": false,
+      "detect_gate_tamper": true
+    },
+    {
+      "name": "Calle / puente",
+      "kind": "calle",
+      "polygon": [
+        { "x": 0.55, "y": 0.0 },
+        { "x": 1.0, "y": 0.0 },
+        { "x": 1.0, "y": 0.42 },
+        { "x": 0.55, "y": 0.30 }
+      ],
+      "loiter_seconds": 5,
+      "detect_people": true,
+      "detect_vehicles": true,
+      "detect_gate_tamper": false
+    }
+  ]
+}

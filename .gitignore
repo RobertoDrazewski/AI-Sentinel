@@ -1,0 +1,27 @@
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.env
+backend/*.db
+backend/app/models_data/*.onnx
+backend/app/known_faces/*
+!backend/app/known_faces/.gitkeep
+backend/app/snapshots/*
+!backend/app/snapshots/.gitkeep
+backend/yolov8n.pt
+backend/*.pt
+# Frontend compilado que copia el Dockerfile acá adentro para que FastAPI lo
+# sirva en el deploy de un solo servicio (Railway) -- es un artefacto de build,
+# no código fuente.
+backend/static_frontend/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/dev-dist/
+
+# Sistema
+.DS_Store
+*.log
