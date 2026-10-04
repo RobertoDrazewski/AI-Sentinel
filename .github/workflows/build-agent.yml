@@ -15,13 +15,14 @@ jobs:
           - os: windows-latest
             artifact_name: ai-sentinel-agent-windows
             pyinstaller_sep: ";"
-          - os: macos-latest # Apple Silicon (M1/M2/M3) -- cubre la gran mayoría de Macs
-            # actuales. Sacamos macos-13 (Intel) del matrix: GitHub tiene muy pocos
-            # runners Intel y el job podía quedarse horas en cola sin arrancar. Apple no
-            # vende Macs Intel desde 2020, así que no vale la pena esperar por esa franja
-            # cada vez más chica de usuarios -- si alguna vez hace falta, se puede volver
-            # a agregar esta línea.
+          - os: macos-latest # Apple Silicon (M1/M2/M3/M4)
             artifact_name: ai-sentinel-agent-mac-applesilicon
+            pyinstaller_sep: ":"
+          - os: macos-13 # Intel (Macs 2020 o anteriores) -- Roberto mismo tiene una Mac
+            # Intel, así que esta build hace falta sí o sí. GitHub tiene menos runners
+            # Intel que Apple Silicon, así que este job puede tardar más en arrancar
+            # (a veces varios minutos en cola) -- es normal, no es que se colgó.
+            artifact_name: ai-sentinel-agent-mac-intel
             pyinstaller_sep: ":"
     runs-on: ${{ matrix.os }}
     steps:
@@ -81,10 +82,14 @@ jobs:
             --hidden-import app.routers.auth \
             --hidden-import app.routers.cameras \
             --hidden-import app.routers.faces \
+            --hidden-import app.routers.local_activation \
             --hidden-import app.routers.stream \
             --hidden-import app.routers.subscription \
             --hidden-import app.routers.telegram \
             --hidden-import app.routers.zones \
+            --hidden-import app.phone_home \
+            --hidden-import app.device_id \
+            --hidden-import app.integrations.cloudflare_client \
             agent_main.py
 
       - name: Subir el resultado como artifact descargable
@@ -115,6 +120,7 @@ jobs:
           mkdir -p release-files
           cp built/ai-sentinel-agent-windows/ai-sentinel-agent.exe release-files/ai-sentinel-agent-windows.exe
           cp built/ai-sentinel-agent-mac-applesilicon/ai-sentinel-agent release-files/ai-sentinel-agent-mac-applesilicon
+          cp built/ai-sentinel-agent-mac-intel/ai-sentinel-agent release-files/ai-sentinel-agent-mac-intel
 
       - name: Publicar como Release en AI-Sentinel-Releases
         env:
@@ -123,6 +129,7 @@ jobs:
           gh release create "v${{ github.run_number }}" \
             release-files/ai-sentinel-agent-windows.exe \
             release-files/ai-sentinel-agent-mac-applesilicon \
+            release-files/ai-sentinel-agent-mac-intel \
             --repo RobertoDrazewski/AI-Sentinel-Releases \
             --title "AI Sentinel Agent - build ${{ github.run_number }}" \
             --notes "Compilado automáticamente desde AI-Sentinel @ ${{ github.sha }}"
