@@ -16,18 +16,27 @@ const DOWNLOADS = {
     file: "ai-sentinel-agent-windows.exe",
     note: "Windows 10 o 11 (64 bits)"
   },
-  mac: {
-    label: "Mac",
+  "mac-applesilicon": {
+    label: "Mac (Apple Silicon)",
     file: "ai-sentinel-agent-mac-applesilicon",
-    note: "Mac con chip Apple (M1, M2, M3 o M4 -- 2020 en adelante)"
+    note: "Mac con chip Apple -- M1, M2, M3 o M4 (2020 en adelante)"
+  },
+  "mac-intel": {
+    label: "Mac (Intel)",
+    file: "ai-sentinel-agent-mac-intel",
+    note: "Mac con chip Intel (2020 o anterior)"
   }
 } as const;
 
+type DownloadKey = keyof typeof DOWNLOADS;
 type OS = "windows" | "mac" | "otro";
 
-// Detecta el sistema operativo desde el navegador para sugerir el botón
-// correcto primero -- los dos botones quedan siempre visibles igual, esto
-// sólo decide cuál se destaca arriba.
+// Detecta el sistema operativo desde el navegador para saber si mostrar
+// Windows o las opciones de Mac -- pero NO se puede distinguir Apple Silicon
+// de Intel desde el navegador: por compatibilidad, Safari y Chrome reportan
+// "Intel Mac OS X" en el user agent incluso corriendo en un M1/M2/M3/M4. Por
+// eso en Mac mostramos los dos botones sin destacar ninguno, y una ayuda para
+// que el usuario vea cuál chip tiene.
 function detectOS(): OS {
   if (typeof navigator === "undefined") return "otro";
   const ua = `${navigator.userAgent} ${navigator.platform || ""}`.toLowerCase();
@@ -36,7 +45,7 @@ function detectOS(): OS {
   return "otro";
 }
 
-function DownloadButton({ os, highlighted }: { os: "windows" | "mac"; highlighted: boolean }) {
+function DownloadButton({ os, highlighted }: { os: DownloadKey; highlighted: boolean }) {
   const info = DOWNLOADS[os];
   const Logo = os === "windows" ? WindowsLogo : AppleLogo;
   return (
@@ -75,27 +84,54 @@ export default function Download() {
         </p>
       </div>
 
-      {os !== "otro" && (
+      {os === "windows" && (
         <div className="space-y-2">
-          <p className="text-xs text-slate-500">
-            Detectamos que estás en {DOWNLOADS[os].label} -- este es tu instalador:
-          </p>
-          <DownloadButton os={os} highlighted />
+          <p className="text-xs text-slate-500">Detectamos que estás en Windows -- este es tu instalador:</p>
+          <DownloadButton os="windows" highlighted />
         </div>
       )}
 
-      <div className="space-y-2">
-        {os !== "otro" && (
-          <p className="text-xs text-slate-500">¿Vas a instalarlo en otra computadora?</p>
-        )}
+      {os === "mac" && (
         <div className="space-y-2">
-          {(["windows", "mac"] as const)
-            .filter((o) => o !== os)
-            .map((o) => (
-              <DownloadButton key={o} os={o} highlighted={false} />
-            ))}
+          <p className="text-xs text-slate-500">
+            Detectamos que estás en Mac. El navegador no puede saber qué chip tenés (Apple Silicon o
+            Intel), así que elegí el que corresponda:
+          </p>
+          <DownloadButton os="mac-applesilicon" highlighted={false} />
+          <DownloadButton os="mac-intel" highlighted={false} />
+          <p className="text-xs text-slate-500">
+            ¿No sabés cuál tenés? Apretá el logo de Apple (arriba a la izquierda) → "Acerca de esta
+            Mac". Si dice "Chip: Apple M1/M2/M3/M4" es Apple Silicon; si dice "Procesador: Intel" es
+            Intel.
+          </p>
         </div>
-      </div>
+      )}
+
+      {(() => {
+        // Ya mostramos arriba el/los botones que corresponden al SO detectado
+        // (Windows, o los dos de Mac si no se puede distinguir el chip) -- acá
+        // abajo van el resto, por si instala en otra computadora distinta a
+        // ésta. Si no se detectó nada (os === "otro"), van los tres sin texto
+        // de "otra computadora" arriba.
+        const remaining: DownloadKey[] =
+          os === "windows"
+            ? ["mac-applesilicon", "mac-intel"]
+            : os === "mac"
+            ? ["windows"]
+            : ["windows", "mac-applesilicon", "mac-intel"];
+        return (
+          <div className="space-y-2">
+            {os !== "otro" && (
+              <p className="text-xs text-slate-500">¿Vas a instalarlo en otra computadora?</p>
+            )}
+            <div className="space-y-2">
+              {remaining.map((o) => (
+                <DownloadButton key={o} os={o} highlighted={false} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
         <p className="text-slate-300 font-medium">Después de instalarlo</p>
@@ -114,7 +150,8 @@ export default function Download() {
           <p className="text-slate-300 font-medium">En Mac, la primera vez</p>
           <p>
             macOS va a avisar que es de "un desarrollador no identificado" (todavía no tiene la firma
-            paga de Apple). Abrí la Terminal, andá a la carpeta donde se descargó y corré:
+            paga de Apple). Abrí la Terminal, andá a la carpeta donde se descargó y corré (reemplazá el
+            nombre del archivo por el que bajaste, Apple Silicon o Intel):
           </p>
           <code className="block bg-panel2 px-2 py-1.5 rounded text-accent break-all">
             chmod +x ai-sentinel-agent-mac-applesilicon && ./ai-sentinel-agent-mac-applesilicon
