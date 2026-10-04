@@ -5,8 +5,8 @@ from sqlmodel import Session, select
 
 from app.auth import get_current_user
 from app.database import get_session
-from app.models import Alert, Camera, Payment, Subscription, User
-from app.schemas import AdminUserSummary, SubscriptionStatusUpdate
+from app.models import Alert, AgentToken, Camera, Payment, Subscription, User
+from app.schemas import AdminUserSummary, AgentDeviceOut, SubscriptionStatusUpdate
 from app.utils import add_one_month
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -45,6 +45,9 @@ def list_users(session: Session = Depends(get_session), _: User = Depends(requir
                 select(Alert).where(Alert.user_id == u.id).where(Alert.created_at >= month_start)
             ).all()
         )
+        devices_count = len(
+            session.exec(select(AgentToken).where(AgentToken.user_id == u.id)).all()
+        )
         out.append(
             AdminUserSummary(
                 id=u.id,
@@ -57,9 +60,50 @@ def list_users(session: Session = Depends(get_session), _: User = Depends(requir
                 next_due_date=next_due,
                 cameras_count=cameras_count,
                 alerts_this_month=alerts_count,
+                devices_count=devices_count,
             )
         )
     return out
+
+
+@router.get("/users/{user_id}/devices", response_model=list[AgentDeviceOut])
+def list_user_devices(
+    user_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+):
+    """Qué PCs tiene emparejadas esta cuenta -- para revisar algo raro (ej: dos
+    dispositivos activos el mismo día desde IPs muy distintas) antes de decidir
+    si conviene revocar uno."""
+    rows = session.exec(select(AgentToken).where(AgentToken.user_id == user_id)).all()
+    return [
+        AgentDeviceOut(
+            id=r.id,
+            label=r.label,
+            created_at=r.created_at,
+            last_seen_at=r.last_seen_at,
+            last_seen_ip=r.last_seen_ip,
+        )
+        for r in rows
+    ]
+
+
+@router.delete("/users/{user_id}/devices/{device_id}")
+def revoke_user_device(
+    user_id: int,
+    device_id: int,
+    session: Session = Depends(get_session),
+    _: User = Depends(require_admin),
+):
+    """Revoca a mano el agente de un cliente (ej: parece compartido, se vendió la
+    PC, o directamente se le quiere cortar el acceso) -- el ejecutable de esa PC
+    deja de poder validar la licencia en la próxima consulta."""
+    row = session.get(AgentToken, device_id)
+    if not row or row.user_id != user_id:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    session.delete(row)
+    session.commit()
+    return {"ok": True}
 
 
 @router.put("/users/{user_id}/subscription-status")

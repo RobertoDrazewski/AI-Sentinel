@@ -57,6 +57,12 @@ def _migrate_existing_tables() -> None:
                         )
                     )
 
+    if "agenttoken" in table_names:
+        existing_agenttoken_cols = {c["name"] for c in inspector.get_columns("agenttoken")}
+        if "last_seen_ip" not in existing_agenttoken_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE agenttoken ADD COLUMN last_seen_ip VARCHAR"))
+
 
 def init_db() -> None:
     # Importa los modelos para que SQLModel los registre antes de crear las tablas

@@ -7,7 +7,19 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import init_db
-from app.routers import admin, agent, alerts, auth, cameras, faces, stream, subscription, telegram, zones
+from app.routers import (
+    admin,
+    agent,
+    alerts,
+    auth,
+    cameras,
+    faces,
+    local_activation,
+    stream,
+    subscription,
+    telegram,
+    zones,
+)
 
 # Estas carpetas tienen que existir ANTES de montar StaticFiles más abajo (el mount se
 # evalúa al importar el módulo, antes de que corra el evento de startup).
@@ -47,6 +59,7 @@ app.include_router(telegram.router)
 app.include_router(subscription.router)
 app.include_router(admin.router)
 app.include_router(agent.router)
+app.include_router(local_activation.router)
 app.include_router(stream.router)
 
 # Fotos de rostros conocidos y snapshots de alertas servidas directo (quedan detrás

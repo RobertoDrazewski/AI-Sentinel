@@ -183,6 +183,7 @@ class AdminUserSummary(BaseModel):
     next_due_date: Optional[datetime] = None
     cameras_count: int
     alerts_this_month: int
+    devices_count: int
 
 
 class SubscriptionStatusUpdate(BaseModel):
@@ -192,6 +193,10 @@ class SubscriptionStatusUpdate(BaseModel):
 # --- Agente local / licencia ---
 class AgentPairIn(BaseModel):
     label: Optional[str] = None  # ej: "Mac de Roberto" -- nombre de la máquina
+    # Hash de la huella de hardware de la máquina (ver app/device_id.py) -- sirve
+    # para notar si esta PC física ya usó el trial gratis con otra cuenta antes.
+    # Opcional porque versiones viejas del agente todavía no lo mandan.
+    device_fingerprint: Optional[str] = None
 
 
 class AgentPairOut(BaseModel):
@@ -209,6 +214,7 @@ class AgentDeviceOut(BaseModel):
     label: str
     created_at: datetime
     last_seen_at: Optional[datetime] = None
+    last_seen_ip: Optional[str] = None
 
 
 class LicenseStatusOut(BaseModel):
@@ -217,3 +223,35 @@ class LicenseStatusOut(BaseModel):
     reason: str
     trial_ends_at: Optional[datetime] = None
     trial_active: bool
+
+
+class TunnelOut(BaseModel):
+    """Para el AGENTE local -- incluye el connector_token, necesario para que
+    levante `cloudflared` por detrás. Nunca se manda esto al navegador."""
+
+    hostname: str
+    connector_token: str
+
+
+class TunnelPublicOut(BaseModel):
+    """Para el panel WEB (botón "Ver en el celular") -- sólo el hostname, nunca
+    el connector_token (ese sería equivalente a una llave de acceso al túnel)."""
+
+    hostname: str
+    configured: bool  # False = Cloudflare no está configurado en el servidor todavía
+
+
+# --- Activación local del agente empaquetado (ver routers/local_activation.py) ---
+class LocalActivationStatusOut(BaseModel):
+    activated: bool
+    central_server_configured: bool
+
+
+class LocalActivateIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LocalActivateOut(BaseModel):
+    ok: bool
+    label: str

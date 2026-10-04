@@ -10,6 +10,8 @@ import Billing from "./pages/Billing";
 import Onboarding from "./pages/Onboarding";
 import CameraSettings from "./pages/CameraSettings";
 import Admin from "./pages/Admin";
+import Download from "./pages/Download";
+import Activation from "./pages/Activation";
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth();
@@ -24,6 +26,7 @@ export default function App() {
       <Nav />
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/activation" element={<Activation />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -47,6 +50,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Billing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/download"
+          element={
+            <ProtectedRoute>
+              <Download />
             </ProtectedRoute>
           }
         />

@@ -34,7 +34,9 @@ def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> 
 
 
 def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme), session: Session = Depends(get_session)
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,6 +60,8 @@ def get_current_user(
         if user is None:
             raise credentials_exception
         agent_token.last_seen_at = datetime.now(timezone.utc)
+        if request is not None and request.client is not None:
+            agent_token.last_seen_ip = request.client.host
         session.add(agent_token)
         session.commit()
         return user
@@ -88,4 +92,4 @@ def get_current_user_from_query_or_header(
             token = auth_header.removeprefix("Bearer ")
     if not token:
         raise HTTPException(status_code=401, detail="Falta token")
-    return get_current_user(token=token, session=session)
+    return get_current_user(request=request, token=token, session=session)

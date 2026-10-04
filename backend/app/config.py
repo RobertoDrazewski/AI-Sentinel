@@ -77,5 +77,24 @@ class Settings(BaseSettings):
     # se loguea con la cuenta -- de ahí en más lo reusa sin pedir contraseña de nuevo.
     AGENT_TOKEN_FILE: str = _default("agent_token.txt", ".agent_token_dev.txt")
 
+    # URL del SERVIDOR CENTRAL (el portal público, ej en Railway) -- SOLO la usa el
+    # agente empaquetado (agent_main.py) para activarse y validar la licencia/túnel.
+    # Vacío = todavía no se desplegó el servidor central (el agente funciona en modo
+    # local nomás, sin licencia remota, como hasta ahora). Ver app/routers/local_activation.py.
+    CENTRAL_SERVER_URL: str = ""
+
+    # Credenciales de la API de Cloudflare, para que el SERVIDOR CENTRAL cree un túnel
+    # (Cloudflare Tunnel) propio y estable por cada cliente -- ver
+    # app/integrations/cloudflare_client.py. Vacío = todavía no se configuró (la función
+    # de "ver desde el celular" queda deshabilitada hasta que se complete esto).
+    # Alcance recomendado del token: Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit,
+    # restringido a la zona de CLOUDFLARE_TUNNEL_DOMAIN solamente.
+    CLOUDFLARE_API_TOKEN: str = ""
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+    CLOUDFLARE_ZONE_ID: str = ""
+    # Dominio bajo el cual se crea el subdominio de cada cliente, ej:
+    # cliente{user.id}.ai-sentinel.puma-code.com
+    CLOUDFLARE_TUNNEL_DOMAIN: str = "ai-sentinel.puma-code.com"
+
 
 settings = Settings()

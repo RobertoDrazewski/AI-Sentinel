@@ -45,6 +45,9 @@ export default function Nav() {
         <NavLink to="/billing" className={linkClass}>
           Suscripción
         </NavLink>
+        <NavLink to="/download" className={linkClass}>
+          Descargar
+        </NavLink>
         {user.role === "admin" && (
           <NavLink to="/admin" className={linkClass}>
             Admin

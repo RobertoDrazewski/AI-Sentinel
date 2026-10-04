@@ -8,6 +8,20 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def ensure_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """SQLite (a diferencia de Postgres) no guarda la zona horaria: un datetime
+    "aware" (con zona) que se guarda vuelve "naive" (sin zona) al leerlo de
+    nuevo de la base. Como en toda la app generamos las fechas en UTC (ver
+    utcnow()), si vuelve sin zona asumimos que es UTC. Sin pasar por esto antes
+    de comparar, `datetime.now(timezone.utc) < user.trial_ends_at` tira
+    TypeError apenas el usuario viene de una consulta a la base (no de un
+    objeto recién creado en memoria) -- por eso no se nota en pruebas rápidas
+    pero rompe en el uso real."""
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def default_trial_end() -> datetime:
     return utcnow() + timedelta(days=30)
 
@@ -134,6 +148,60 @@ class AgentToken(SQLModel, table=True):
     label: str = Field(default="Agente")  # ej: "Mac de Roberto", nombre de la máquina
     created_at: datetime = Field(default_factory=utcnow)
     last_seen_at: Optional[datetime] = None
+    # IP pública desde la que consultó por última vez (ver auth.py). No identifica
+    # ubicación exacta, pero alcanza para que en el panel Admin se note algo raro
+    # -- ej: el mismo token usado desde dos IPs muy distintas el mismo día -- y
+    # decidir si conviene revocar el dispositivo.
+    last_seen_ip: Optional[str] = None
+
+
+# Cuántos agentes (PCs) como máximo puede tener emparejados AL MISMO TIEMPO una
+# sola cuenta. Pensado para permitir el uso normal (PC de escritorio + notebook,
+# o reinstalar en una PC nueva) sin abrir la puerta a que una sola suscripción
+# se comparta libremente entre varias personas/casas. Ver routers/agent.py.
+MAX_AGENT_DEVICES_PER_USER = 2
+
+
+class TrialDevice(SQLModel, table=True):
+    """Para notar si una PC física ya usó la prueba gratis de 30 días con OTRA
+    cuenta antes de ahora -- si alguien deja vencer el trial sin pagar y se
+    registra de nuevo con un mail distinto en la misma máquina para "renovar"
+    los 30 días gratis, a esa cuenta nueva no se los damos (ver pair_agent en
+    routers/agent.py: si el fingerprint ya está acá con OTRO user_id, el
+    trial de la cuenta nueva queda vencido desde el momento en que se activa).
+    No bloqueamos el emparejamiento en sí -- la app le sigue andando sin IA
+    hasta que pague, igual que a cualquier cuenta con el trial vencido.
+
+    fingerprint_hash es un hash (nunca el ID real de hardware) de un
+    identificador estable de la máquina -- ver app/device_id.py en el lado
+    del agente. No es a prueba de balas (alguien técnico podría forzarlo a
+    cambiar), pero cubre el caso normal de "me registro de nuevo para otros
+    30 días gratis" sin pedirle nada raro al usuario ni tocar su privacidad
+    (no se guarda ningún dato personal, sólo el hash)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    fingerprint_hash: str = Field(unique=True, index=True)
+    first_user_id: int = Field(foreign_key="user.id")
+    first_seen_at: datetime = Field(default_factory=utcnow)
+
+
+class ClientTunnel(SQLModel, table=True):
+    """Túnel de Cloudflare propio y ESTABLE de este cliente (el subdominio no
+    cambia nunca, a diferencia de un "Quick Tunnel") -- ver
+    app/integrations/cloudflare_client.py. Se crea una sola vez, la primera
+    vez que el agente local lo pide (GET /api/agent/tunnel); de ahí en más
+    siempre se reusa el mismo. cf_connector_token es lo que el agente necesita
+    para levantar `cloudflared` por detrás -- es sensible (equivale a una
+    llave de acceso a ese túnel), así que sólo se lo mandamos al propio
+    agente autenticado, nunca a la respuesta que lee el navegador."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    subdomain: str = Field(unique=True, index=True)
+    hostname: str
+    cf_tunnel_id: str
+    cf_connector_token: str
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class Payment(SQLModel, table=True):

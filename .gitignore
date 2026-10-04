@@ -16,6 +16,15 @@ backend/*.pt
 # no código fuente.
 backend/static_frontend/
 
+# Lo que deja PyInstaller al compilar el agente a mano en tu Mac (ver
+# "ahora la pregunta del millon mi mac es..."): ejecutables de cientos de MB,
+# GitHub los rechaza (límite 100MB por archivo) y de cualquier forma esto
+# siempre se recompila solo en el workflow de Actions -- nunca va al repo.
+backend/dist/
+backend/build/
+*.pkg
+*.spec
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
@@ -25,3 +34,11 @@ frontend/dev-dist/
 # Sistema
 .DS_Store
 *.log
+
+# Lo que deja PyInstaller al compilar el agente a mano en tu Mac: ejecutables
+# de cientos de MB, GitHub los rechaza (límite 100MB) y de cualquier forma esto
+# siempre se recompila solo en el workflow de Actions -- nunca va al repo.
+backend/dist/
+backend/build/
+*.pkg
+*.spec

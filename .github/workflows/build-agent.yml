@@ -93,3 +93,36 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: backend/dist/
           retention-days: 30
+
+  # Junta los ejecutables de los dos jobs de arriba y los publica como Release
+  # en AI-Sentinel-Releases -- un repo APARTE, público, que no tiene nada de
+  # código fuente (ver frontend: pages/Download.tsx usa ese link fijo
+  # "releases/latest/download/<archivo>" para los botones de descarga). Así
+  # un cliente cualquiera puede bajar el instalador sin login de GitHub, sin
+  # que este repo (el del código, con toda la lógica de licencias) deje de
+  # ser privado.
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar los ejecutables compilados en el job anterior
+        uses: actions/download-artifact@v4
+        with:
+          path: built
+
+      - name: Armar los archivos con el nombre final de descarga
+        run: |
+          mkdir -p release-files
+          cp built/ai-sentinel-agent-windows/ai-sentinel-agent.exe release-files/ai-sentinel-agent-windows.exe
+          cp built/ai-sentinel-agent-mac-applesilicon/ai-sentinel-agent release-files/ai-sentinel-agent-mac-applesilicon
+
+      - name: Publicar como Release en AI-Sentinel-Releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          gh release create "v${{ github.run_number }}" \
+            release-files/ai-sentinel-agent-windows.exe \
+            release-files/ai-sentinel-agent-mac-applesilicon \
+            --repo RobertoDrazewski/AI-Sentinel-Releases \
+            --title "AI Sentinel Agent - build ${{ github.run_number }}" \
+            --notes "Compilado automáticamente desde AI-Sentinel @ ${{ github.sha }}"

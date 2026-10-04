@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { BellRing, Car, Lock, MapPinned, ScanFace, ShieldAlert, type LucideIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { AppleLogo, WindowsLogo } from "../components/OsLogos";
 import logo from "../assets/logo-sentinel.png";
 
 // Las 5 zonas de la imagen de fondo que sí representan algo real del
@@ -154,6 +155,26 @@ function useRevealOnScroll<T extends HTMLElement>() {
   return { ref, visible };
 }
 
+/** Chip chico con los dos logos reales, cerca de los botones de "Crear
+ * cuenta" -- deja claro de entrada que el programa que se bajan corre en su
+ * propia PC (Windows o Mac), no "en la nube". */
+function OsAvailability() {
+  return (
+    <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400">
+      <span>Disponible para</span>
+      <span className="inline-flex items-center gap-1">
+        <WindowsLogo className="w-3.5 h-3.5" />
+        Windows
+      </span>
+      <span className="text-slate-600">·</span>
+      <span className="inline-flex items-center gap-1">
+        <AppleLogo className="w-3.5 h-3.5" />
+        Mac
+      </span>
+    </div>
+  );
+}
+
 function PrivacyNote({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
@@ -218,6 +239,7 @@ function HeroText({ compact = false }: { compact?: boolean }) {
           Ingresar
         </Link>
       </div>
+      <OsAvailability />
       <PrivacyNote compact />
     </>
   );

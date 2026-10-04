@@ -13,6 +13,11 @@ Lo que hace, en orden:
 3. Abre el navegador en http://localhost:8000 un segundo y medio después de
    arrancar -- tiempo de sobra para que uvicorn ya esté escuchando.
 4. Arranca el servidor, igual que hace run.sh.
+5. Si ya está activado (ver app/routers/local_activation.py) y el build tiene
+   configurado un servidor central, arranca en segundo plano la sincronización
+   de licencia/túnel contra ese servidor (ver app/phone_home.py). Si todavía no
+   se activó, o no hay servidor central configurado, esto no hace nada -- el
+   agente sigue funcionando exactamente como antes.
 """
 import os
 import shutil
@@ -67,8 +72,14 @@ def main() -> None:
     import uvicorn
 
     from app.main import app
+    from app import phone_home
 
-    threading.Timer(1.5, lambda: webbrowser.open("http://localhost:8000")).start()
+    phone_home.start_background_sync()
+
+    # "/activation" se salta solo (redirige a /login) en builds sin servidor
+    # central configurado -- así este cambio no afecta nada de cómo ya venía
+    # funcionando esto para builds sin CENTRAL_SERVER_URL.
+    threading.Timer(1.5, lambda: webbrowser.open("http://localhost:8000/activation")).start()
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
