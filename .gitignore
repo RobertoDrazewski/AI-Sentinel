@@ -42,3 +42,5 @@ backend/dist/
 backend/build/
 *.pkg
 *.spec
+backend/app/models_data/*.pt
+backend/app/models_data/*.db
