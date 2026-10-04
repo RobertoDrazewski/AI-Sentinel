@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
 
 from app.auth import get_current_user
@@ -99,7 +99,13 @@ def simulate_payment(
 ):
     """SOLO PARA DESARROLLO LOCAL: activa la suscripción sin pasar por Mercado Pago,
     para poder probar el resto del sistema sin depender de un túnel público.
-    Sacar o proteger este endpoint antes de llevar esto a producción."""
+    Apagado por defecto (ver ALLOW_SIMULATED_PAYMENTS en config.py) -- en el
+    servidor de producción esto tiene que seguir apagado siempre."""
+    if not settings.ALLOW_SIMULATED_PAYMENTS:
+        raise HTTPException(
+            status_code=403,
+            detail="Simular pagos está deshabilitado en este servidor.",
+        )
     sub = _get_or_create(session, current_user.id)
     sub.status = "activa"
     session.add(sub)

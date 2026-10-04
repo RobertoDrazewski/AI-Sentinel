@@ -77,13 +77,13 @@ class Settings(BaseSettings):
     # se loguea con la cuenta -- de ahí en más lo reusa sin pedir contraseña de nuevo.
     AGENT_TOKEN_FILE: str = _default("agent_token.txt", ".agent_token_dev.txt")
 
-    # URL del SERVIDOR CENTRAL (el portal público, desplegado en Railway) -- SOLO la
-    # usa el agente empaquetado (agent_main.py) para activarse y validar la
-    # licencia/túnel. Ver app/routers/local_activation.py. Si alguna vez se cambia de
-    # dominio (ej: un dominio propio en vez del de Railway), hay que actualizar esto
-    # acá y volver a compilar el agente (Actions -> build-agent.yml) para que el
-    # cambio quede en los próximos instaladores.
-    CENTRAL_SERVER_URL: str = "https://ai-sentinel-production-v1.up.railway.app"
+    # URL del SERVIDOR CENTRAL (el portal público -- dominio propio, apunta vía
+    # Cloudflare al servicio en Railway) -- SOLO la usa el agente empaquetado
+    # (agent_main.py) para activarse y validar la licencia/túnel. Ver
+    # app/routers/local_activation.py. Si alguna vez se cambia de dominio, hay que
+    # actualizar esto acá y volver a compilar el agente (Actions -> build-agent.yml)
+    # para que el cambio quede en los próximos instaladores.
+    CENTRAL_SERVER_URL: str = "https://ai-sentinel.puma-code.com"
 
     # Credenciales de la API de Cloudflare, para que el SERVIDOR CENTRAL cree un túnel
     # (Cloudflare Tunnel) propio y estable por cada cliente -- ver

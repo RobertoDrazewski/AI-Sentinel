@@ -219,12 +219,14 @@ export default function Billing() {
         Pagar con Mercado Pago
       </button>
 
-      <button
-        onClick={handleSimulate}
-        className="w-full py-2 rounded-lg bg-panel2 text-slate-300 text-sm"
-      >
-        (Dev) Simular pago aprobado sin Mercado Pago
-      </button>
+      {import.meta.env.DEV && (
+        <button
+          onClick={handleSimulate}
+          className="w-full py-2 rounded-lg bg-panel2 text-slate-300 text-sm"
+        >
+          (Dev) Simular pago aprobado sin Mercado Pago
+        </button>
+      )}
 
       {message && <p className="text-sm text-slate-300">{message}</p>}
 
