@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import { useAppMode } from "../context/AppModeContext";
 import LiveStream from "../components/LiveStream";
 import PanicButton from "../components/PanicButton";
 
@@ -13,6 +14,7 @@ interface Camera {
 }
 
 export default function Dashboard() {
+  const { isLocalAgent } = useAppMode();
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +42,24 @@ export default function Dashboard() {
   if (loading) return <div className="p-6 text-slate-400">Cargando cámaras...</div>;
 
   if (cameras.length === 0) {
+    // En el portal central (Railway) no tiene sentido mandar a nadie a /onboarding:
+    // esa pantalla intenta conectarse a una cámara en la red local del cliente, y
+    // un servidor en la nube no tiene forma de llegar ahí. Acá explicamos que la
+    // configuración se hace desde el agente instalado en su PC y lo mandamos a
+    // /download en vez de a un formulario que va a fallar siempre.
+    if (isLocalAgent === false) {
+      return (
+        <div className="p-6 text-center space-y-4">
+          <p className="text-slate-400">
+            Todavía no configuraste ninguna cámara. La configuración de cámaras se hace desde la
+            aplicación instalada en tu computadora, no desde esta web.
+          </p>
+          <Link to="/download" className="inline-block px-4 py-2 rounded-lg bg-accent text-slate-900 font-semibold">
+            Descargar la aplicación
+          </Link>
+        </div>
+      );
+    }
     return (
       <div className="p-6 text-center space-y-4">
         <p className="text-slate-400">Todavía no configuraste ninguna cámara.</p>

@@ -1,10 +1,12 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useAppMode } from "../context/AppModeContext";
 import logo from "../assets/logo-sentinel.png";
 
 export default function Register() {
   const { register } = useAuth();
+  const { isLocalAgent } = useAppMode();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +20,11 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email, password, businessName || undefined);
-      navigate("/onboarding");
+      // En el portal central (Railway) /onboarding no puede funcionar -- intenta
+      // conectarse a una cámara en la red local del cliente, inalcanzable desde la
+      // nube -- así que mandamos directo a /dashboard, que ya sabe mostrar el
+      // mensaje correcto ("descargá la aplicación") en vez de ese formulario roto.
+      navigate(isLocalAgent === false ? "/dashboard" : "/onboarding");
     } catch (err: any) {
       setError(err.message || "Error al registrarse");
     } finally {

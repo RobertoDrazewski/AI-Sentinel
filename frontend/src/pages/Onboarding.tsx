@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { useAppMode } from "../context/AppModeContext";
 import ZoneCanvasEditor, { Point } from "../components/ZoneCanvasEditor";
 
 const BRAND_LABELS: Record<string, string> = {
@@ -46,6 +47,7 @@ type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function Onboarding() {
   const navigate = useNavigate();
+  const { isLocalAgent } = useAppMode();
   const [step, setStep] = useState<Step>(1);
 
   // --- Paso 1: cámara ---
@@ -147,6 +149,27 @@ export default function Onboarding() {
       await api.post(`/api/cameras/${cameraId}/start`);
     }
     navigate("/dashboard");
+  }
+
+  // Si alguien llega acá por URL directa en el portal central (Railway), este
+  // asistente nunca puede funcionar: necesita conectarse por red local a la
+  // cámara, y la nube no tiene forma de llegar a una IP 192.168.x.x de la casa
+  // del cliente. En vez de dejarlo entrar y fallar en el paso de prueba de
+  // conexión, lo explicamos de una y lo mandamos a descargar la aplicación.
+  if (isLocalAgent === false) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-4 text-center">
+        <h1 className="text-xl font-bold text-accent">Configurar nueva cámara</h1>
+        <p className="text-slate-400">
+          La configuración de cámaras se hace desde la aplicación instalada en tu computadora, no
+          desde esta web: necesita conectarse directamente a tu cámara en tu red local, y esta
+          página no tiene acceso a ella.
+        </p>
+        <Link to="/download" className="inline-block px-4 py-2 rounded-lg bg-accent text-slate-900 font-semibold">
+          Descargar la aplicación
+        </Link>
+      </div>
+    );
   }
 
   return (

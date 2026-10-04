@@ -1,9 +1,11 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useAppMode } from "../context/AppModeContext";
 import logo from "../assets/logo-sentinel.png";
 
 export default function Nav() {
   const { user, logout } = useAuth();
+  const { isLocalAgent } = useAppMode();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -33,15 +35,24 @@ export default function Nav() {
       {/* En mobile esta fila se desplaza horizontal en vez de amontonarse o
           desbordar la pantalla; en desktop entra entera sin necesidad de scroll. */}
       <div className="flex items-center gap-1 px-4 pb-3 overflow-x-auto">
-        <NavLink to="/dashboard" className={linkClass}>
-          Cámaras
-        </NavLink>
-        <NavLink to="/alerts" className={linkClass}>
-          Alertas
-        </NavLink>
-        <NavLink to="/onboarding" className={linkClass}>
-          + Agregar cámara
-        </NavLink>
+        {/* Cámaras/Alertas/Agregar cámara sólo tienen sentido en el agente local
+            (acceso directo a la red de casa) -- en el portal público (Railway)
+            se ocultan para no mandar a nadie a un formulario que no puede
+            funcionar ahí. isLocalAgent === null (todavía cargando) no oculta
+            nada, para no hacer parpadear el menú. */}
+        {isLocalAgent !== false && (
+          <>
+            <NavLink to="/dashboard" className={linkClass}>
+              Cámaras
+            </NavLink>
+            <NavLink to="/alerts" className={linkClass}>
+              Alertas
+            </NavLink>
+            <NavLink to="/onboarding" className={linkClass}>
+              + Agregar cámara
+            </NavLink>
+          </>
+        )}
         <NavLink to="/billing" className={linkClass}>
           Suscripción
         </NavLink>

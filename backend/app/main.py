@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
+from app.config import _is_frozen, settings
 from app.database import init_db
 from app.routers import (
     admin,
@@ -70,7 +70,17 @@ app.mount("/media/snapshots", StaticFiles(directory=settings.SNAPSHOTS_DIR), nam
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "centinela-ia-backend"}
+    # is_local_agent le dice al frontend si está hablando con el AGENTE LOCAL
+    # (instalado en la PC de un cliente, con acceso directo a su cámara/DVR por
+    # red local) o con el PORTAL CENTRAL (Railway) -- un backend en la nube no
+    # puede ver una IP 192.168.x.x de la casa de nadie, así que la configuración
+    # de cámaras/zonas/onboarding sólo tiene sentido mostrarla en el primer caso.
+    # Ver Nav.tsx, Dashboard.tsx, Onboarding.tsx y Register.tsx.
+    return {
+        "status": "ok",
+        "service": "centinela-ia-backend",
+        "is_local_agent": _is_frozen(),
+    }
 
 
 # --- Frontend compilado (sólo en producción) ---
