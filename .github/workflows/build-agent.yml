@@ -15,11 +15,13 @@ jobs:
           - os: windows-latest
             artifact_name: ai-sentinel-agent-windows
             pyinstaller_sep: ";"
-          - os: macos-latest # Apple Silicon (M1/M2/M3)
+          - os: macos-latest # Apple Silicon (M1/M2/M3) -- cubre la gran mayoría de Macs
+            # actuales. Sacamos macos-13 (Intel) del matrix: GitHub tiene muy pocos
+            # runners Intel y el job podía quedarse horas en cola sin arrancar. Apple no
+            # vende Macs Intel desde 2020, así que no vale la pena esperar por esa franja
+            # cada vez más chica de usuarios -- si alguna vez hace falta, se puede volver
+            # a agregar esta línea.
             artifact_name: ai-sentinel-agent-mac-applesilicon
-            pyinstaller_sep: ":"
-          - os: macos-13 # Intel
-            artifact_name: ai-sentinel-agent-mac-intel
             pyinstaller_sep: ":"
     runs-on: ${{ matrix.os }}
     steps:
