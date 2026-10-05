@@ -96,6 +96,32 @@ jobs:
         # .spec una sola vez y queda igual en todos lados.
         run: pyinstaller ai-sentinel-agent.spec
 
+      - name: Firmar y comprimir la app de Mac (antes de que upload-artifact la toque)
+        if: runner.os == 'macOS'
+        working-directory: backend
+        shell: bash
+        # Dos problemas reales de Mac que hay que resolver ACÁ, en el mismo runner de
+        # macOS, antes de subir nada:
+        # 1) Firma: una app sin NINGUNA firma (ni siquiera ad-hoc) puede aparecer como
+        #    "dañada" en Mac en vez del aviso normal de "desarrollador no identificado".
+        #    La firmamos con "-" (ad-hoc, sin certificado pago de Apple) para que macOS
+        #    al menos la reconozca como "con firma".
+        # 2) Symlinks: "AI Sentinel.app" trae symlinks por dentro (Python.framework,
+        #    dylibs de cv2). actions/upload-artifact NO preserva symlinks al subir una
+        #    carpeta -- si subiéramos la carpeta tal cual, el bundle llega roto/
+        #    incompleto al job que arma el Release (esto es, caso casi seguro, la causa
+        #    real de "la app no se puede abrir" que le pasó a Roberto). La solución es
+        #    comprimirla ACÁ MISMO, en el runner de Mac donde se generó, con `ditto`
+        #    (la herramienta de Apple para esto -- preserva symlinks y metadata mejor
+        #    que zip) -- lo que sube el artifact es ya un .zip íntegro, nunca la carpeta
+        #    suelta.
+        run: |
+          codesign --force --deep --sign - "dist/AI Sentinel.app"
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "AI Sentinel.app" "ai-sentinel-agent-mac.zip"
+          rm -rf "AI Sentinel.app"
+          cd ..
+
       - name: Subir el resultado como artifact descargable
         uses: actions/upload-artifact@v4
         with:
@@ -120,21 +146,17 @@ jobs:
           path: built
 
       - name: Armar los archivos con el nombre final de descarga
-        # Windows sigue siendo un .exe suelto. Mac ahora empaqueta "AI Sentinel.app"
-        # (una carpeta, ver BUNDLE en ai-sentinel-agent.spec) -- un Release de GitHub
-        # sólo admite archivos sueltos, así que la comprimimos en un .zip. "zip -y"
-        # conserva los symlinks internos del .app (si no, la app queda rota).
+        # Windows sigue siendo un .exe suelto. Mac ya viene comprimido en un .zip desde
+        # el propio job de macOS (paso "Firmar y comprimir la app de Mac" de arriba) --
+        # acá sólo hace falta copiarlo con el nombre final. A PROPÓSITO no volvemos a
+        # tocar/re-zipear el .app acá: este job corre en Ubuntu, y re-zipear ahí un
+        # bundle de Mac (o dejar que upload-artifact suba la carpeta suelta) es
+        # justamente lo que rompía los symlinks internos y dejaba la app "dañada".
         run: |
           mkdir -p release-files
           cp built/ai-sentinel-agent-windows/ai-sentinel-agent.exe release-files/ai-sentinel-agent-windows.exe
-
-          cd built/ai-sentinel-agent-mac-applesilicon
-          zip -r -y ../../release-files/ai-sentinel-agent-mac-applesilicon.zip "AI Sentinel.app"
-          cd ../..
-
-          cd built/ai-sentinel-agent-mac-intel
-          zip -r -y ../../release-files/ai-sentinel-agent-mac-intel.zip "AI Sentinel.app"
-          cd ../..
+          cp built/ai-sentinel-agent-mac-applesilicon/ai-sentinel-agent-mac.zip release-files/ai-sentinel-agent-mac-applesilicon.zip
+          cp built/ai-sentinel-agent-mac-intel/ai-sentinel-agent-mac.zip release-files/ai-sentinel-agent-mac-intel.zip
 
       - name: Publicar como Release en AI-Sentinel-Releases
         env:
