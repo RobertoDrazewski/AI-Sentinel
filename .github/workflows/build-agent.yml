@@ -16,10 +16,12 @@ jobs:
             artifact_name: ai-sentinel-agent-windows
           - os: macos-latest # Apple Silicon (M1/M2/M3/M4)
             artifact_name: ai-sentinel-agent-mac-applesilicon
-          - os: macos-13 # Intel (Macs 2020 o anteriores) -- Roberto mismo tiene una Mac
-            # Intel, así que esta build hace falta sí o sí. GitHub tiene menos runners
-            # Intel que Apple Silicon, así que este job puede tardar más en arrancar
-            # (a veces varios minutos en cola) -- es normal, no es que se colgó.
+          - os: macos-15-intel # Intel (Macs 2020 o anteriores) -- Roberto mismo tiene una
+            # Mac Intel, así que esta build hace falta sí o sí. OJO: antes acá decía
+            # "macos-13", pero GitHub retiró esas runners del todo en diciembre 2025 --
+            # por eso el job se quedaba "en cola" para siempre sin arrancar nunca, ni
+            # dejándolo toda la noche. "macos-15-intel" es la etiqueta que lo reemplazó
+            # para compilar en runners Intel.
             artifact_name: ai-sentinel-agent-mac-intel
     runs-on: ${{ matrix.os }}
     steps:
