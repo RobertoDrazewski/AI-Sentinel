@@ -57,8 +57,13 @@ jobs:
           # mezclados. Con los dos instalados juntos, cv2.VideoCapture(...,
           # cv2.CAP_FFMPEG) queda roto en el agente ya compilado (ninguna cámara
           # RTSP puede conectar, sin ningún error de Python -- tardamos horas en
-          # encontrar esto). Lo sacamos siempre, en los tres sistemas operativos.
-          pip uninstall -y opencv-python
+          # encontrar esto). OJO: desinstalar sólo "opencv-python" (dejando
+          # "opencv-python-headless" como está) NO alcanza -- como comparten
+          # archivos, sacar uno solo deja al otro roto a medias (ej:
+          # "AttributeError: module 'cv2' has no attribute 'setNumThreads'").
+          # Hay que sacar los DOS y reinstalar sólo el headless de cero.
+          pip uninstall -y opencv-python opencv-python-headless
+          pip install opencv-python-headless==4.10.0.84 --no-deps
 
       - name: Descargar modelos de reconocimiento facial (YuNet + SFace)
         working-directory: backend
