@@ -21,10 +21,14 @@ from __future__ import annotations
 import socket
 
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
 
+from app.auth import hash_password
 from app.config import settings
+from app.database import get_session
 from app.device_id import get_machine_fingerprint_hash
+from app.models import User
 from app.schemas import LocalActivateIn, LocalActivateOut, LocalActivationStatusOut
 
 router = APIRouter(prefix="/api/local", tags=["local"])
@@ -47,7 +51,7 @@ def activation_status():
 
 
 @router.post("/activate", response_model=LocalActivateOut)
-def activate(data: LocalActivateIn):
+def activate(data: LocalActivateIn, session: Session = Depends(get_session)):
     if not settings.CENTRAL_SERVER_URL:
         raise HTTPException(
             status_code=503,
@@ -89,5 +93,25 @@ def activate(data: LocalActivateIn):
     agent_token = pair_resp.json()["token"]
     with open(settings.AGENT_TOKEN_FILE, "w", encoding="utf-8") as f:
         f.write(agent_token)
+
+    # Emparejar el agente con el servidor central NO crea ninguna cuenta en la base
+    # LOCAL de esta PC (esa base arranca vacía en cada instalación nueva) -- y el
+    # /login de acá en más (pantalla normal del panel) valida contra esa base local,
+    # no contra el servidor central. Sin este paso, ese login nunca iba a funcionar:
+    # nadie llenaba la base local. Creamos (o, si ya existía, actualizamos la
+    # contraseña de) un usuario local con el mismo mail/contraseña que el cliente
+    # ya validó recién contra el servidor central, para que pueda loguearse acá.
+    local_user = session.exec(select(User).where(User.email == data.email)).first()
+    if local_user is None:
+        is_first_user = session.exec(select(User)).first() is None
+        local_user = User(
+            email=data.email,
+            password_hash=hash_password(data.password),
+            role="admin" if is_first_user else "cliente",
+        )
+        session.add(local_user)
+    else:
+        local_user.password_hash = hash_password(data.password)
+    session.commit()
 
     return LocalActivateOut(ok=True, label=label)

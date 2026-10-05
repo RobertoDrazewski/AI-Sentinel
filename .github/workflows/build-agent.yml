@@ -14,16 +14,13 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: ai-sentinel-agent-windows
-            pyinstaller_sep: ";"
           - os: macos-latest # Apple Silicon (M1/M2/M3/M4)
             artifact_name: ai-sentinel-agent-mac-applesilicon
-            pyinstaller_sep: ":"
           - os: macos-13 # Intel (Macs 2020 o anteriores) -- Roberto mismo tiene una Mac
             # Intel, así que esta build hace falta sí o sí. GitHub tiene menos runners
             # Intel que Apple Silicon, así que este job puede tardar más en arrancar
             # (a veces varios minutos en cola) -- es normal, no es que se colgó.
             artifact_name: ai-sentinel-agent-mac-intel
-            pyinstaller_sep: ":"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +51,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+          # ultralytics instala "opencv-python" (con gui) como dependencia propia
+          # además del "opencv-python-headless" que ya pedimos en requirements.txt
+          # -- los dos escriben en la misma carpeta "cv2/" del venv y quedan
+          # mezclados. Con los dos instalados juntos, cv2.VideoCapture(...,
+          # cv2.CAP_FFMPEG) queda roto en el agente ya compilado (ninguna cámara
+          # RTSP puede conectar, sin ningún error de Python -- tardamos horas en
+          # encontrar esto). Lo sacamos siempre, en los tres sistemas operativos.
+          pip uninstall -y opencv-python
 
       - name: Descargar modelos de reconocimiento facial (YuNet + SFace)
         working-directory: backend
@@ -70,27 +75,14 @@ jobs:
       - name: Empaquetar con PyInstaller
         working-directory: backend
         shell: bash
-        run: |
-          pyinstaller --onefile --name ai-sentinel-agent \
-            --add-data "app/models_data${{ matrix.pyinstaller_sep }}app/models_data" \
-            --add-data "static_frontend${{ matrix.pyinstaller_sep }}static_frontend" \
-            --collect-all ultralytics \
-            --collect-all cv2 \
-            --hidden-import app.routers.admin \
-            --hidden-import app.routers.agent \
-            --hidden-import app.routers.alerts \
-            --hidden-import app.routers.auth \
-            --hidden-import app.routers.cameras \
-            --hidden-import app.routers.faces \
-            --hidden-import app.routers.local_activation \
-            --hidden-import app.routers.stream \
-            --hidden-import app.routers.subscription \
-            --hidden-import app.routers.telegram \
-            --hidden-import app.routers.zones \
-            --hidden-import app.phone_home \
-            --hidden-import app.device_id \
-            --hidden-import app.integrations.cloudflare_client \
-            agent_main.py
+        # Usamos el ai-sentinel-agent.spec (en vez de repetir acá todas las opciones
+        # a mano) para que la build de GitHub Actions sea EXACTAMENTE la misma que
+        # la que se compila a mano en una Mac -- incluye el "upx=False" (UPX rompía
+        # la conexión RTSP en el agente empaquetado en Mac, sin ningún error visible)
+        # y el ajuste de ruta de los .dylib de FFmpeg que trae cv2. Si hace falta
+        # cambiar algo del empaquetado (datas, hidden-imports, etc), se edita el
+        # .spec una sola vez y queda igual en todos lados.
+        run: pyinstaller ai-sentinel-agent.spec
 
       - name: Subir el resultado como artifact descargable
         uses: actions/upload-artifact@v4

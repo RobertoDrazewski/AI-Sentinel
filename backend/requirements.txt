@@ -15,6 +15,17 @@ numpy==1.26.4
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
 torchvision
+# OJO: ultralytics pide "opencv-python" (la versión CON gui) como dependencia
+# propia, sin importar que acá arriba ya pedimos opencv-python-headless -- pip
+# instala los dos, y como los dos escriben adentro de la MISMA carpeta "cv2/"
+# del venv, terminan mezclados (archivos de un paquete y del otro conviviendo).
+# Con los dos instalados juntos, "cv2.VideoCapture(..., cv2.CAP_FFMPEG)" se
+# rompe en el agente ya compilado con PyInstaller (ni vos ni tu cámara tienen
+# la culpa -- probado: tarda HORAS encontrar esto si no se sabe). Por eso
+# después de "pip install -r requirements.txt" SIEMPRE hay que correr:
+#   pip uninstall -y opencv-python
+# (el build-agent.yml de GitHub Actions ya lo hace solo; esto es sólo para
+# cuando instalás/reinstalás a mano en tu Mac, como con un venv nuevo).
 ultralytics==8.2.103
 requests==2.32.3
 mercadopago==2.2.3

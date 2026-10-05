@@ -46,6 +46,28 @@ export function mediaUrl(path: string): string {
   return path;
 }
 
+// El "detail" de un error de FastAPI puede venir en dos formas MUY distintas:
+// - HTTPException normal (ej. "Email o contraseña incorrectos"): detail es un string.
+// - Error de validación de pydantic (ej. un email mal formado): detail es una LISTA
+//   de objetos ({loc, msg, type, ...}), uno por cada campo que falló. Si no se
+//   distinguen los dos casos, un string de un objeto/lista termina mostrando
+//   literalmente "[object Object]" en pantalla -- lo convertimos siempre a un
+//   mensaje de texto legible.
+function extractErrorMessage(data: any): string {
+  const detail = data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d) => (typeof d === "string" ? d : d?.msg)).filter(Boolean);
+    if (msgs.length) return msgs.join(" / ");
+  }
+  if (detail && typeof detail === "object" && typeof detail.msg === "string") return detail.msg;
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return "Error inesperado";
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -64,7 +86,7 @@ async function request<T>(
     let detail = res.statusText;
     try {
       const data = await res.json();
-      detail = data.detail || JSON.stringify(data);
+      detail = extractErrorMessage(data) || detail;
     } catch {
       // nada, usamos statusText
     }

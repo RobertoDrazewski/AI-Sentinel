@@ -44,6 +44,12 @@ class WorkerState:
     status: str = "iniciando"
     user_id: Optional[int] = None
     face_index: Optional["face_engine.KnownFaceIndex"] = None
+    # Zonas y detectores de reja/timbre vigentes para el hilo que está corriendo.
+    # _run_loop() lee estas dos cosas desde acá en cada vuelta del while (no desde
+    # variables locales fijadas una sola vez al arrancar), así que reload_zones()
+    # puede reemplazarlas en caliente y el cambio se nota al instante.
+    zones: List[Zone] = field(default_factory=list)
+    gate_detectors: Dict[int, "GateTamperDetector"] = field(default_factory=dict)
 
 
 def reload_known_faces(user_id: int) -> None:
@@ -57,6 +63,36 @@ def reload_known_faces(user_id: int) -> None:
     for state in _workers.values():
         if state.user_id == user_id and state.face_index is not None:
             state.face_index.load(pairs)
+
+
+def reload_zones(camera_id: int) -> None:
+    """Mismo problema que reload_known_faces() pero con las zonas: si una cámara ya
+    está monitoreando y desde Configuración creás, editás o borrás una zona, el hilo
+    que está corriendo seguía usando para siempre la lista de zonas que leyó al
+    arrancar -- nunca se enteraba. Esto relee las zonas de la cámara desde la base y
+    las deja listas para que _run_loop() las use en la próxima vuelta, sin tener que
+    parar y volver a iniciar el monitoreo.
+    Se llama desde create_zone/update_zone/delete_zone en routers/zones.py."""
+    state = _workers.get(camera_id)
+    if state is None or not state.thread.is_alive():
+        return  # esta cámara no está corriendo ahora: _run_loop() va a leer fresco cuando arranque
+    with Session(engine) as session:
+        zones = session.exec(select(Zone).where(Zone.camera_id == camera_id)).all()
+    state.zones = zones
+    # Reconstruye los detectores de movimiento (reja/timbre) para que coincidan con
+    # las zonas actuales. Reusamos la instancia existente cuando la zona sigue
+    # igual (así no perdemos la "referencia congelada" que ya tenía aprendida); una
+    # zona nueva recibe un detector nuevo, y una zona borrada o que ya no pide
+    # detect_gate_tamper simplemente no entra en el diccionario nuevo.
+    new_detectors: Dict[int, GateTamperDetector] = {}
+    for z in zones:
+        if not z.detect_gate_tamper:
+            continue
+        existing = state.gate_detectors.get(z.id)
+        new_detectors[z.id] = existing if existing is not None else GateTamperDetector(
+            min_sustained_seconds=0.12 if z.kind == "timbre" else 1.5
+        )
+    state.gate_detectors = new_detectors
 
 
 _workers: Dict[int, WorkerState] = {}
@@ -159,6 +195,12 @@ def _run_loop(camera_id: int, stop_event: threading.Event) -> None:
         for z in zones
         if z.detect_gate_tamper
     }
+    # Guardamos también en el state compartido: reload_zones() escribe ahí cuando
+    # se crea/edita/borra una zona desde la API mientras este hilo ya está
+    # corriendo, y el while de abajo relee state.zones/state.gate_detectors en
+    # cada vuelta (no las variables locales de acá arriba) para enterarse al toque.
+    state.zones = zones
+    state.gate_detectors = gate_detectors
 
     cap: Optional[cv2.VideoCapture] = None
     reconnect_wait = 3
@@ -168,8 +210,11 @@ def _run_loop(camera_id: int, stop_event: threading.Event) -> None:
     while not stop_event.is_set():
         if cap is None or not cap.isOpened():
             state.status = "conectando"
-            cap = cv2.VideoCapture(camera.rtsp_url, cv2.CAP_FFMPEG)
-            if not cap.isOpened():
+            # TCP primero y, si la cámara lo rechaza (pasa con algunas EZVIZ/Hikvision
+            # de consumo aunque el mismo stream abra bien en VLC), reintenta por UDP --
+            # ver el porqué en rtsp_utils.open_capture_with_fallback().
+            cap, _transport = rtsp_utils.open_capture_with_fallback(camera.rtsp_url)
+            if cap is None:
                 _set_camera_status(camera_id, "error")
                 state.status = "error"
                 time.sleep(reconnect_wait)
@@ -204,6 +249,13 @@ def _run_loop(camera_id: int, stop_event: threading.Event) -> None:
         h, w = frame.shape[:2]
         frame_count += 1
         display_frame = frame.copy()
+
+        # Releer desde el state en cada vuelta (no usar la variable fijada al
+        # arrancar el hilo): así, si reload_zones() cambió esto mientras tanto
+        # (zona creada/editada/borrada desde Configuración con la cámara ya
+        # monitoreando), el frame siguiente ya lo refleja.
+        zones = state.zones
+        gate_detectors = state.gate_detectors
 
         zones_px = {
             z.id: _polygon_to_px(json.loads(z.polygon_json), w, h) for z in zones
