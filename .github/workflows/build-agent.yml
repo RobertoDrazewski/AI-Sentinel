@@ -25,9 +25,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Instalar Python 3.10 (Windows -- el del runner de GitHub sirve)
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+
+      - name: Instalar Python 3.10 (Mac -- el oficial de python.org, NO el del runner)
+        if: runner.os == 'macOS'
+        shell: bash
+        # El Python que trae el runner de GitHub (macos-latest / macos-15-intel) está
+        # compilado en una Mac con una versión de macOS mucho más nueva que la de
+        # muchos clientes (ej: Roberto mismo, con un MacBook Pro de 2012 en macOS 12
+        # Monterey). Ese Python usa una función del sistema ("mkfifoat") que Apple
+        # agregó recién en una versión de macOS más nueva -- en una Mac vieja el
+        # agente ya compilado no arranca, sin ningún error visible al hacer doble
+        # clic (confirmado corriendo el binario desde la Terminal: "Symbol not
+        # found: (_mkfifoat), Expected in: /usr/lib/libSystem.B.dylib"). El
+        # instalador oficial de python.org SÍ está compilado para andar en Macs
+        # viejas (universal2, Apple Silicon + Intel, desde macOS 11 en adelante).
+        run: |
+          curl -fsSL -o python.pkg "https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg"
+          sudo installer -pkg python.pkg -target /
+          PYBIN="/Library/Frameworks/Python.framework/Versions/3.10/bin"
+          sudo ln -sf "$PYBIN/python3.10" "$PYBIN/python"
+          sudo ln -sf "$PYBIN/pip3.10" "$PYBIN/pip"
+          echo "$PYBIN" >> "$GITHUB_PATH"
+          "$PYBIN/python3.10" --version
 
       - uses: actions/setup-node@v4
         with:
