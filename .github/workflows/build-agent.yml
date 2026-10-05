@@ -17,11 +17,9 @@ jobs:
           - os: macos-latest # Apple Silicon (M1/M2/M3/M4)
             artifact_name: ai-sentinel-agent-mac-applesilicon
           - os: macos-15-intel # Intel (Macs 2020 o anteriores) -- Roberto mismo tiene una
-            # Mac Intel, así que esta build hace falta sí o sí. OJO: antes acá decía
-            # "macos-13", pero GitHub retiró esas runners del todo en diciembre 2025 --
-            # por eso el job se quedaba "en cola" para siempre sin arrancar nunca, ni
-            # dejándolo toda la noche. "macos-15-intel" es la etiqueta que lo reemplazó
-            # para compilar en runners Intel.
+            # Mac Intel, así que esta build hace falta sí o sí. GitHub retiró "macos-13"
+            # en dic/2025 (quedaba en cola para siempre); "macos-15-intel" es la etiqueta
+            # vigente para runners Intel.
             artifact_name: ai-sentinel-agent-mac-intel
     runs-on: ${{ matrix.os }}
     steps:
@@ -79,6 +77,13 @@ jobs:
           python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
           mv yolov8n.pt app/models_data/yolov8n.pt
 
+      - name: Generar los íconos del instalador (el mismo que "agregar a pantalla de inicio" en el celular)
+        working-directory: backend
+        shell: bash
+        run: |
+          pip install pillow
+          python scripts/make_icons.py
+
       - name: Empaquetar con PyInstaller
         working-directory: backend
         shell: bash
@@ -115,11 +120,21 @@ jobs:
           path: built
 
       - name: Armar los archivos con el nombre final de descarga
+        # Windows sigue siendo un .exe suelto. Mac ahora empaqueta "AI Sentinel.app"
+        # (una carpeta, ver BUNDLE en ai-sentinel-agent.spec) -- un Release de GitHub
+        # sólo admite archivos sueltos, así que la comprimimos en un .zip. "zip -y"
+        # conserva los symlinks internos del .app (si no, la app queda rota).
         run: |
           mkdir -p release-files
           cp built/ai-sentinel-agent-windows/ai-sentinel-agent.exe release-files/ai-sentinel-agent-windows.exe
-          cp built/ai-sentinel-agent-mac-applesilicon/ai-sentinel-agent release-files/ai-sentinel-agent-mac-applesilicon
-          cp built/ai-sentinel-agent-mac-intel/ai-sentinel-agent release-files/ai-sentinel-agent-mac-intel
+
+          cd built/ai-sentinel-agent-mac-applesilicon
+          zip -r -y ../../release-files/ai-sentinel-agent-mac-applesilicon.zip "AI Sentinel.app"
+          cd ../..
+
+          cd built/ai-sentinel-agent-mac-intel
+          zip -r -y ../../release-files/ai-sentinel-agent-mac-intel.zip "AI Sentinel.app"
+          cd ../..
 
       - name: Publicar como Release en AI-Sentinel-Releases
         env:
@@ -127,8 +142,8 @@ jobs:
         run: |
           gh release create "v${{ github.run_number }}" \
             release-files/ai-sentinel-agent-windows.exe \
-            release-files/ai-sentinel-agent-mac-applesilicon \
-            release-files/ai-sentinel-agent-mac-intel \
+            release-files/ai-sentinel-agent-mac-applesilicon.zip \
+            release-files/ai-sentinel-agent-mac-intel.zip \
             --repo RobertoDrazewski/AI-Sentinel-Releases \
             --title "AI Sentinel Agent - build ${{ github.run_number }}" \
             --notes "Compilado automáticamente desde AI-Sentinel @ ${{ github.sha }}"

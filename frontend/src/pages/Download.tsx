@@ -18,12 +18,12 @@ const DOWNLOADS = {
   },
   "mac-applesilicon": {
     label: "Mac (Apple Silicon)",
-    file: "ai-sentinel-agent-mac-applesilicon",
+    file: "ai-sentinel-agent-mac-applesilicon.zip",
     note: "Mac con chip Apple -- M1, M2, M3 o M4 (2020 en adelante)"
   },
   "mac-intel": {
     label: "Mac (Intel)",
-    file: "ai-sentinel-agent-mac-intel",
+    file: "ai-sentinel-agent-mac-intel.zip",
     note: "Mac con chip Intel (2020 o anterior)"
   }
 } as const;
@@ -148,15 +148,15 @@ export default function Download() {
             <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
               <p className="text-slate-300 font-medium">En Mac, la primera vez</p>
               <p>
-                macOS va a avisar que es de "un desarrollador no identificado" (todavía no tiene la firma
-                paga de Apple). Abrí la Terminal, andá a la carpeta donde se descargó y corré (reemplazá el
-                nombre del archivo por el que bajaste, Apple Silicon o Intel):
+                Se descarga un .zip. Abrilo con doble clic (se descomprime solo) y vas a ver{" "}
+                <span className="text-slate-300">AI Sentinel.app</span> -- arrastralo a tu carpeta de
+                Aplicaciones.
               </p>
-              <code className="block bg-panel2 px-2 py-1.5 rounded text-accent break-all">
-                chmod +x ai-sentinel-agent-mac-applesilicon && ./ai-sentinel-agent-mac-applesilicon
-              </code>
               <p>
-                Más adelante vamos a tener un instalador con doble clic, sin pasar por la Terminal.
+                Al abrirlo, macOS va a avisar que es de "un desarrollador no identificado" (todavía no
+                tiene la firma paga de Apple). Hacé clic derecho sobre AI Sentinel → <b>Abrir</b> → confirmá{" "}
+                <b>Abrir</b> en el aviso. Sólo hace falta esa primera vez; después abre con doble clic
+                normal, como cualquier otro programa.
               </p>
             </div>
           )}
