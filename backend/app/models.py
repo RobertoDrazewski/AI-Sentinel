@@ -48,6 +48,12 @@ class User(SQLModel, table=True):
     # agente local funciona con reconocimiento/detección inteligente habilitado
     # aunque todavía no haya pagado nada. Ver app/licensing.py.
     trial_ends_at: datetime = Field(default_factory=default_trial_end)
+    # Fase 2 del pedido de Roberto de separar "uso doméstico" de "uso en
+    # negocio/fábrica": este campo sólo cambia VOCABULARIO en el panel por
+    # ahora (ver CameraSettings.tsx/Billing.tsx) -- "negocio" es la base sobre
+    # la que más adelante (fase 3, todavía no construida) se engancha el
+    # fichaje de empleados con reconocimiento facial.
+    account_mode: str = Field(default="hogar")  # hogar | negocio
 
 
 class Camera(SQLModel, table=True):

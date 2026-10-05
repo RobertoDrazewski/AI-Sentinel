@@ -7,6 +7,7 @@ interface UserOut {
   business_name?: string;
   plan_status: string;
   role: string;
+  account_mode: "hogar" | "negocio";
 }
 
 interface AuthState {
@@ -15,6 +16,9 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, businessName?: string) => Promise<void>;
   logout: () => void;
+  // Para releer /me después de cambiar algo del perfil sin pasar por login/register
+  // de nuevo -- hoy lo usa el selector de modo Hogar/Negocio en Billing.tsx.
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -60,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser: refreshMe }}>
       {children}
     </AuthContext.Provider>
   );

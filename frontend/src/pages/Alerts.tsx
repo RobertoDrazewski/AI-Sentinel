@@ -19,15 +19,20 @@ export default function Alerts() {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-3">
-      <h1 className="text-xl font-bold text-accent mb-2">Alertas recientes</h1>
+    <div className="max-w-7xl mx-auto p-4">
+      <h1 className="text-xl font-bold text-accent mb-4">Alertas recientes</h1>
       {loading && <p className="text-slate-400">Cargando...</p>}
       {!loading && alerts.length === 0 && (
         <p className="text-slate-400">Todavía no hay alertas registradas.</p>
       )}
-      {alerts.map((a) => (
-        <AlertCard key={a.id} alert={a} />
-      ))}
+      {/* En pantallas anchas se acomodan en columnas en vez de una sola lista
+          larga y angosta -- así se aprovecha el ancho en vez de dejar todo el
+          espacio de los costados vacío. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {alerts.map((a) => (
+          <AlertCard key={a.id} alert={a} />
+        ))}
+      </div>
     </div>
   );
 }

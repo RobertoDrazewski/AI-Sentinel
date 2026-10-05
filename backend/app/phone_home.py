@@ -154,6 +154,10 @@ def ensure_cloudflared_binary() -> Optional[Path]:
     return dest
 
 
+def cloudflared_log_path() -> Path:
+    return _cloudflared_bin_dir().parent / "cloudflared.log"
+
+
 def _ensure_tunnel_running(connector_token: str) -> None:
     global _cloudflared_process, _cloudflared_token_running
 
@@ -169,13 +173,22 @@ def _ensure_tunnel_running(connector_token: str) -> None:
         _cloudflared_process.terminate()
 
     try:
+        # Antes tirábamos stdout/stderr a DEVNULL -- si cloudflared no lograba
+        # conectar (token vencido, firewall/red bloqueando la salida hacia
+        # Cloudflare, etc.) no quedaba NINGÚN rastro en ningún lado para darse
+        # cuenta por qué "no se puede acceder al sitio" desde el celular. Ahora
+        # queda anotado en un archivo de texto al lado de la base de datos local
+        # (ver cloudflared_log_path() -- "~/Library/Application Support/AI
+        # Sentinel/cloudflared.log" en Mac) para poder revisarlo a mano.
+        log_path = cloudflared_log_path()
+        log_file = open(log_path, "a", encoding="utf-8")
         _cloudflared_process = subprocess.Popen(
             [str(binary), "tunnel", "run", "--token", connector_token],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
         )
         _cloudflared_token_running = connector_token
-        log.info("Túnel de Cloudflare iniciado")
+        log.info("Túnel de Cloudflare iniciado (log en %s)", log_path)
     except OSError as exc:
         log.warning("No se pudo iniciar cloudflared: %s", exc)
 

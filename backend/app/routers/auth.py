@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.database import get_session
 from app.models import User
-from app.schemas import Token, UserLogin, UserOut, UserRegister
+from app.schemas import AccountModeUpdate, Token, UserLogin, UserOut, UserRegister
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -45,4 +45,21 @@ def login(data: UserLogin, session: Session = Depends(get_session)):
 
 @router.get("/me", response_model=UserOut)
 def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/account-mode", response_model=UserOut)
+def update_account_mode(
+    data: AccountModeUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Hogar/Negocio (fase 2) -- hoy sólo cambia vocabulario en el panel (ver
+    CameraSettings.tsx y Billing.tsx), nada de la detección en sí."""
+    if data.account_mode not in ("hogar", "negocio"):
+        raise HTTPException(status_code=400, detail="account_mode tiene que ser 'hogar' o 'negocio'")
+    current_user.account_mode = data.account_mode
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
     return current_user

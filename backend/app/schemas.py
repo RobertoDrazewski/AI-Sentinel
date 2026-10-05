@@ -27,6 +27,11 @@ class UserOut(BaseModel):
     plan_status: str
     role: str = "cliente"
     trial_ends_at: Optional[datetime] = None
+    account_mode: str = "hogar"  # hogar | negocio
+
+
+class AccountModeUpdate(BaseModel):
+    account_mode: str  # "hogar" | "negocio"
 
 
 # --- Cameras ---

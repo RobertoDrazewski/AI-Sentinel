@@ -74,8 +74,15 @@ export default function Download() {
     setOs(detectOS());
   }, []);
 
+  const remaining: DownloadKey[] =
+    os === "windows"
+      ? ["mac-applesilicon", "mac-intel"]
+      : os === "mac"
+      ? ["windows"]
+      : ["windows", "mac-applesilicon", "mac-intel"];
+
   return (
-    <div className="max-w-md mx-auto p-6 space-y-5">
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-accent">Descargar el agente</h1>
         <p className="text-sm text-slate-400 mt-1">
@@ -84,42 +91,34 @@ export default function Download() {
         </p>
       </div>
 
-      {os === "windows" && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500">Detectamos que estás en Windows -- este es tu instalador:</p>
-          <DownloadButton os="windows" highlighted />
-        </div>
-      )}
+      {/* En pantallas anchas los botones de descarga van a la izquierda y las
+          instrucciones de después de instalar a la derecha, en vez de una sola
+          columna angosta centrada con todo el resto de la pantalla vacío. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="space-y-4">
+          {os === "windows" && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">Detectamos que estás en Windows -- este es tu instalador:</p>
+              <DownloadButton os="windows" highlighted />
+            </div>
+          )}
 
-      {os === "mac" && (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500">
-            Detectamos que estás en Mac. El navegador no puede saber qué chip tenés (Apple Silicon o
-            Intel), así que elegí el que corresponda:
-          </p>
-          <DownloadButton os="mac-applesilicon" highlighted={false} />
-          <DownloadButton os="mac-intel" highlighted={false} />
-          <p className="text-xs text-slate-500">
-            ¿No sabés cuál tenés? Apretá el logo de Apple (arriba a la izquierda) → "Acerca de esta
-            Mac". Si dice "Chip: Apple M1/M2/M3/M4" es Apple Silicon; si dice "Procesador: Intel" es
-            Intel.
-          </p>
-        </div>
-      )}
+          {os === "mac" && (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">
+                Detectamos que estás en Mac. El navegador no puede saber qué chip tenés (Apple Silicon o
+                Intel), así que elegí el que corresponda:
+              </p>
+              <DownloadButton os="mac-applesilicon" highlighted={false} />
+              <DownloadButton os="mac-intel" highlighted={false} />
+              <p className="text-xs text-slate-500">
+                ¿No sabés cuál tenés? Apretá el logo de Apple (arriba a la izquierda) → "Acerca de esta
+                Mac". Si dice "Chip: Apple M1/M2/M3/M4" es Apple Silicon; si dice "Procesador: Intel" es
+                Intel.
+              </p>
+            </div>
+          )}
 
-      {(() => {
-        // Ya mostramos arriba el/los botones que corresponden al SO detectado
-        // (Windows, o los dos de Mac si no se puede distinguir el chip) -- acá
-        // abajo van el resto, por si instala en otra computadora distinta a
-        // ésta. Si no se detectó nada (os === "otro"), van los tres sin texto
-        // de "otra computadora" arriba.
-        const remaining: DownloadKey[] =
-          os === "windows"
-            ? ["mac-applesilicon", "mac-intel"]
-            : os === "mac"
-            ? ["windows"]
-            : ["windows", "mac-applesilicon", "mac-intel"];
-        return (
           <div className="space-y-2">
             {os !== "otro" && (
               <p className="text-xs text-slate-500">¿Vas a instalarlo en otra computadora?</p>
@@ -130,37 +129,39 @@ export default function Download() {
               ))}
             </div>
           </div>
-        );
-      })()}
-
-      <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
-        <p className="text-slate-300 font-medium">Después de instalarlo</p>
-        <p>
-          Al abrirlo por primera vez te va a pedir iniciar sesión con el mismo mail y contraseña de
-          esta cuenta, para activarlo. De ahí en más queda corriendo solo en esa computadora.
-        </p>
-        <p>
-          Por cada suscripción se pueden tener hasta 2 computadoras activadas al mismo tiempo. Podés
-          ver y quitar dispositivos desde "Mi cuenta".
-        </p>
-      </div>
-
-      {os === "mac" || os === "otro" ? (
-        <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
-          <p className="text-slate-300 font-medium">En Mac, la primera vez</p>
-          <p>
-            macOS va a avisar que es de "un desarrollador no identificado" (todavía no tiene la firma
-            paga de Apple). Abrí la Terminal, andá a la carpeta donde se descargó y corré (reemplazá el
-            nombre del archivo por el que bajaste, Apple Silicon o Intel):
-          </p>
-          <code className="block bg-panel2 px-2 py-1.5 rounded text-accent break-all">
-            chmod +x ai-sentinel-agent-mac-applesilicon && ./ai-sentinel-agent-mac-applesilicon
-          </code>
-          <p>
-            Más adelante vamos a tener un instalador con doble clic, sin pasar por la Terminal.
-          </p>
         </div>
-      ) : null}
+
+        <div className="space-y-4">
+          <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
+            <p className="text-slate-300 font-medium">Después de instalarlo</p>
+            <p>
+              Al abrirlo por primera vez te va a pedir iniciar sesión con el mismo mail y contraseña de
+              esta cuenta, para activarlo. De ahí en más queda corriendo solo en esa computadora.
+            </p>
+            <p>
+              Por cada suscripción se pueden tener hasta 2 computadoras activadas al mismo tiempo. Podés
+              ver y quitar dispositivos desde "Mi cuenta".
+            </p>
+          </div>
+
+          {(os === "mac" || os === "otro") && (
+            <div className="bg-panel rounded-xl p-4 space-y-2 text-xs text-slate-400">
+              <p className="text-slate-300 font-medium">En Mac, la primera vez</p>
+              <p>
+                macOS va a avisar que es de "un desarrollador no identificado" (todavía no tiene la firma
+                paga de Apple). Abrí la Terminal, andá a la carpeta donde se descargó y corré (reemplazá el
+                nombre del archivo por el que bajaste, Apple Silicon o Intel):
+              </p>
+              <code className="block bg-panel2 px-2 py-1.5 rounded text-accent break-all">
+                chmod +x ai-sentinel-agent-mac-applesilicon && ./ai-sentinel-agent-mac-applesilicon
+              </code>
+              <p>
+                Más adelante vamos a tener un instalador con doble clic, sin pasar por la Terminal.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

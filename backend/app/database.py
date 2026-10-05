@@ -56,6 +56,9 @@ def _migrate_existing_tables() -> None:
                             "WHERE trial_ends_at IS NULL"
                         )
                     )
+        if "account_mode" not in existing_user_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE user ADD COLUMN account_mode VARCHAR DEFAULT 'hogar'"))
 
     if "agenttoken" in table_names:
         existing_agenttoken_cols = {c["name"] for c in inspector.get_columns("agenttoken")}
