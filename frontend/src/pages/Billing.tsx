@@ -47,6 +47,8 @@ export default function Billing() {
   const [tunnel, setTunnel] = useState<TunnelPublic | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [savingMode, setSavingMode] = useState(false);
+  const [resettingTunnel, setResettingTunnel] = useState(false);
+  const [tunnelResetMsg, setTunnelResetMsg] = useState<string | null>(null);
 
   async function load() {
     const data = await api.get<AccountSummary>("/api/subscription/summary");
@@ -75,6 +77,29 @@ export default function Billing() {
   async function handleRevokeDevice(id: number) {
     await api.del(`/api/agent/devices/${id}`);
     loadDevices();
+  }
+
+  // Los túneles creados antes del fix del hostname de dos niveles (ver
+  // CLOUDFLARE_TUNNEL_DOMAIN en el backend) quedaron guardados con un
+  // subdominio que el SSL de Cloudflare nunca va a cubrir, y _get_or_create_tunnel
+  // del backend reusa para siempre lo que ya esté guardado -- esto los borra
+  // para que se recreen de cero (con el subdominio bueno) la próxima vez que
+  // el agente o este panel los pidan.
+  async function handleResetTunnel() {
+    setResettingTunnel(true);
+    setTunnelResetMsg(null);
+    try {
+      await api.del("/api/agent/tunnel");
+      setShowQr(false);
+      await loadTunnel();
+      setTunnelResetMsg(
+        "Listo. Si el agente de tu PC está prendido, en unos segundos va a tomar la dirección nueva solo."
+      );
+    } catch {
+      setTunnelResetMsg("No se pudo reiniciar el túnel. Probá de nuevo en un momento.");
+    } finally {
+      setResettingTunnel(false);
+    }
   }
 
   useEffect(() => {
@@ -272,6 +297,16 @@ export default function Billing() {
                 Mostrar código QR
               </button>
             )}
+            {tunnel?.configured && (
+              <button
+                onClick={handleResetTunnel}
+                disabled={resettingTunnel}
+                className="text-[11px] text-slate-500 hover:text-slate-300 underline disabled:opacity-50"
+              >
+                {resettingTunnel ? "Reiniciando..." : "¿No carga? Reiniciar túnel"}
+              </button>
+            )}
+            {tunnelResetMsg && <p className="text-[11px] text-slate-400">{tunnelResetMsg}</p>}
           </div>
         </div>
       </div>

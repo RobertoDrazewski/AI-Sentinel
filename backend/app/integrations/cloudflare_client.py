@@ -5,8 +5,10 @@ eso necesita que su agente local, corriendo en una PC detrás de un router de
 casa (sin IP pública ni puerto abierto), sea alcanzable desde afuera. En vez de
 pedirle al cliente que abra puertos en su router (inseguro y la mayoría no sabe
 hacerlo), el SERVIDOR CENTRAL crea un túnel de Cloudflare por cuenta, con un
-subdominio fijo que no cambia nunca (ej: cliente42.ai-sentinel.puma-code.com),
-y le manda al agente el "connector token" para que levante `cloudflared` por
+subdominio fijo que no cambia nunca (ej: ai-sentinel-cliente42.puma-code.com --
+UN solo nivel bajo el apex, no dos, para que quede cubierto por el certificado
+SSL gratuito de Cloudflare: ver el comentario de CLOUDFLARE_TUNNEL_DOMAIN en
+config.py), y le manda al agente el "connector token" para que levante `cloudflared` por
 detrás. Cloudflare hace de intermediario: la PC de casa se conecta HACIA
 afuera (eso sí lo deja pasar cualquier router sin configurar nada) y Cloudflare
 enruta las visitas al subdominio hacia esa conexión.

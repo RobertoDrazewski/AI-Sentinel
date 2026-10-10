@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     MP_PLAN_PRICE_ARS: float = 30000
     MP_WEBHOOK_URL: str = "http://localhost:8000/api/subscription/webhook"
 
+    # Prende /api/subscription/simulate-payment (activa la suscripción sin pasar
+    # por Mercado Pago -- pensado SOLO para probar en tu máquina sin depender de
+    # un túnel público). False por defecto a propósito: en el servidor central de
+    # producción esto NUNCA tiene que estar prendido, porque cualquier cuenta
+    # logueada podría regalarse una suscripción "activa" gratis con sólo apretar
+    # ese botón. Para usarlo en tu Mac, poné ALLOW_SIMULATED_PAYMENTS=true en
+    # backend/.env (nunca en las variables de Railway).
+    ALLOW_SIMULATED_PAYMENTS: bool = False
+
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
@@ -95,8 +104,20 @@ class Settings(BaseSettings):
     CLOUDFLARE_ACCOUNT_ID: str = ""
     CLOUDFLARE_ZONE_ID: str = ""
     # Dominio bajo el cual se crea el subdominio de cada cliente, ej:
-    # cliente{user.id}.ai-sentinel.puma-code.com
-    CLOUDFLARE_TUNNEL_DOMAIN: str = "ai-sentinel.puma-code.com"
+    # ai-sentinel-cliente{user.id}.puma-code.com
+    #
+    # OJO -- tiene que ser el APEX de la zona (acá, "puma-code.com"), NUNCA un
+    # sub-subdominio como "ai-sentinel.puma-code.com". El certificado SSL
+    # gratuito de Cloudflare ("Universal SSL") sólo cubre el apex y UN nivel de
+    # wildcard (puma-code.com y *.puma-code.com) -- un hostname de DOS niveles
+    # como cliente1.ai-sentinel.puma-code.com queda FUERA de ese certificado
+    # para siempre (no es un tema de tiempo de propagación), y el navegador lo
+    # rechaza con ERR_SSL_VERSION_OR_CIPHER_MISMATCH apenas lo probás, sea desde
+    # el celular o desde cualquier compu. Cubrir ese segundo nivel requeriría
+    # pagar el add-on "Advanced Certificate Manager" de Cloudflare -- con el
+    # apex como dominio acá, el mismo wildcard gratuito que ya cubre
+    # ai-sentinel.puma-code.com cubre también cualquier *.puma-code.com nuevo.
+    CLOUDFLARE_TUNNEL_DOMAIN: str = "puma-code.com"
 
 
 settings = Settings()

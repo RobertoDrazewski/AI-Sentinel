@@ -153,7 +153,11 @@ def _get_or_create_tunnel(session: Session, current_user: User) -> ClientTunnel:
     if tunnel is not None:
         return tunnel
 
-    subdomain = f"cliente{current_user.id}"
+    # "ai-sentinel-cliente{id}" en vez de "cliente{id}.ai-sentinel" -- tiene
+    # que quedar como UN solo nivel bajo el apex de CLOUDFLARE_TUNNEL_DOMAIN
+    # para que lo cubra el certificado SSL gratis de Cloudflare (ver el
+    # comentario largo en config.py sobre CLOUDFLARE_TUNNEL_DOMAIN).
+    subdomain = f"ai-sentinel-cliente{current_user.id}"
     result = cloudflare_client.create_tunnel_for_subdomain(subdomain)
     tunnel = ClientTunnel(
         user_id=current_user.id,
@@ -168,14 +172,38 @@ def _get_or_create_tunnel(session: Session, current_user: User) -> ClientTunnel:
     return tunnel
 
 
+@router.delete("/tunnel")
+def reset_tunnel(
+    session: Session = Depends(get_session), current_user: User = Depends(get_current_user)
+):
+    """Borra el túnel guardado de esta cuenta (en Cloudflare y en la base) para
+    que se vuelva a crear de cero la próxima vez que se pida (GET /tunnel o
+    /tunnel/public). Pensado para los túneles que se crearon ANTES del fix del
+    hostname de dos niveles (ver CLOUDFLARE_TUNNEL_DOMAIN en config.py) y
+    quedaron con un subdominio que el SSL de Cloudflare nunca va a cubrir --
+    sin esto quedarían rotos para siempre, porque _get_or_create_tunnel reusa
+    lo que ya esté guardado. También sirve si el túnel se corrompe por
+    cualquier otro motivo."""
+    tunnel = session.exec(
+        select(ClientTunnel).where(ClientTunnel.user_id == current_user.id)
+    ).first()
+    if tunnel is None:
+        return {"ok": True, "deleted": False}
+    cloudflare_client.delete_tunnel(tunnel.cf_tunnel_id)
+    session.delete(tunnel)
+    session.commit()
+    return {"ok": True, "deleted": True}
+
+
 @router.get("/tunnel", response_model=TunnelOut)
 def get_tunnel(
     session: Session = Depends(get_session), current_user: User = Depends(get_current_user)
 ):
     """SOLO lo llama el agente empaquetado (nunca el navegador) -- devuelve el
     connector_token que necesita para levantar `cloudflared` y quedar accesible
-    desde cliente{id}.ai-sentinel.puma-code.com. Se crea una sola vez por cuenta
-    y de ahí en más siempre se reusa el mismo túnel/subdominio."""
+    desde ai-sentinel-cliente{id}.puma-code.com. Se crea una sola vez por
+    cuenta y de ahí en más siempre se reusa el mismo túnel/subdominio (ver
+    DELETE /tunnel para forzar que se recree)."""
     if not cloudflare_client.is_configured():
         raise HTTPException(
             status_code=503,
