@@ -1,12 +1,32 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAppMode } from "../context/AppModeContext";
+import { api } from "../api/client";
 import logo from "../assets/logo-sentinel.png";
+
+interface TunnelPublic {
+  hostname: string;
+  configured: boolean;
+}
 
 export default function Nav() {
   const { user, logout } = useAuth();
   const { isLocalAgent } = useAppMode();
   const navigate = useNavigate();
+  const [tunnel, setTunnel] = useState<TunnelPublic | null>(null);
+
+  // "Panel de control" en el navbar: sólo tiene sentido pedirle el túnel al
+  // backend cuando estamos en el portal central (Railway) -- si ya estamos
+  // adentro del agente local, las pestañas "Cámaras"/"Alertas" de abajo ya
+  // muestran lo mismo, y no hay necesidad de este pedido extra.
+  useEffect(() => {
+    if (!user || isLocalAgent !== false) return;
+    api
+      .get<TunnelPublic>("/api/agent/tunnel/public")
+      .then(setTunnel)
+      .catch(() => setTunnel({ hostname: "", configured: false }));
+  }, [user, isLocalAgent]);
 
   if (!user) return null;
 
@@ -52,6 +72,19 @@ export default function Nav() {
               + Agregar cámara
             </NavLink>
           </>
+        )}
+        {/* Pestaña nueva, visible sólo en el portal central (ai-sentinel.puma-code.com):
+            manda directo al dashboard REAL -- el mismo que ves cuando corrés el agente
+            local -- pero servido por tu propia PC de casa a través del túnel. Es un link
+            normal <a>, no un <NavLink> de react-router, porque apunta a otro dominio
+            (cliente1.ai-sentinel.puma-code.com), no a una ruta interna de esta app. */}
+        {isLocalAgent === false && tunnel?.configured && (
+          <a
+            href={`https://${tunnel.hostname}/dashboard`}
+            className="px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 text-slate-300 hover:bg-panel2"
+          >
+            Panel de control
+          </a>
         )}
         <NavLink to="/billing" className={linkClass}>
           Suscripción
