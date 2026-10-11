@@ -219,13 +219,21 @@ def get_tunnel_public(
 ):
     """La llama el panel WEB (botón "Ver en el celular" / código QR) -- a
     diferencia de /tunnel, nunca devuelve el connector_token. Si Cloudflare no
-    está configurado todavía, o el agente nunca pidió el túnel (configured=False
-    con hostname vacío), el frontend muestra un mensaje en vez del QR.
+    está configurado todavía en el servidor, el frontend muestra un mensaje en
+    vez del QR.
 
     Corriendo DENTRO del agente empaquetado: el túnel en sí lo crea y lo guarda
     el SERVIDOR CENTRAL (esta misma base local no tiene esa tabla con datos
     reales) -- ver app/phone_home.py, que ya lo consultó por su cuenta y lo
-    tiene cacheado."""
+    tiene cacheado.
+
+    Corriendo en el servidor central: si la cuenta todavía no tiene un túnel
+    guardado, lo crea ACÁ MISMO en vez de limitarse a avisar que falta -- antes
+    el cliente dependía de que su agente local llamara GET /tunnel por su
+    cuenta (al prenderse, o una vez por hora), así que podía quedarse mirando
+    "todavía no está disponible" sin ningún botón para apurarlo. Con esto,
+    simplemente entrar a Suscripción ya alcanza para que aparezca el QR, sin
+    esperar a que el agente sincronice solo."""
     if _is_frozen():
         from app import phone_home
 
@@ -234,9 +242,8 @@ def get_tunnel_public(
 
     if not cloudflare_client.is_configured():
         return TunnelPublicOut(hostname="", configured=False)
-    tunnel = session.exec(
-        select(ClientTunnel).where(ClientTunnel.user_id == current_user.id)
-    ).first()
-    if tunnel is None:
+    try:
+        tunnel = _get_or_create_tunnel(session, current_user)
+    except cloudflare_client.CloudflareError:
         return TunnelPublicOut(hostname="", configured=False)
     return TunnelPublicOut(hostname=tunnel.hostname, configured=True)
