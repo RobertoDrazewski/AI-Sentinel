@@ -82,21 +82,45 @@ def _delete_dns_record_if_exists(hostname: str) -> None:
     )
 
 
+def _find_tunnel_id_by_name(name: str) -> Optional[str]:
+    """Busca un túnel (no borrado) por nombre exacto. Se usa cuando Cloudflare
+    rechaza crear uno nuevo porque ya existe uno con ese nombre (ver más abajo)."""
+    resp = requests.get(
+        f"{API_BASE}/accounts/{settings.CLOUDFLARE_ACCOUNT_ID}/cfd_tunnel",
+        headers=_headers(),
+        params={"name": name, "is_deleted": "false"},
+        timeout=15,
+    )
+    data = _check(resp, "buscar el túnel existente por nombre")
+    results = data.get("result") or []
+    return results[0]["id"] if results else None
+
+
 def create_tunnel_for_subdomain(subdomain: str) -> dict:
     """Crea el túnel + la regla de ingreso + el registro DNS para `subdomain`
     (ej: "cliente42"). Devuelve {tunnel_id, connector_token, hostname}.
 
-    Se llama UNA sola vez por cliente -- de ahí en más el resultado se guarda
-    en la tabla ClientTunnel y se reusa siempre (ver routers/agent.py). Como el
-    hostname es siempre el mismo para la misma cuenta, si quedó un registro DNS
-    huérfano de un túnel anterior (ver delete_tunnel) hay que borrarlo PRIMERO --
-    si no, el paso 4 de acá abajo falla porque Cloudflare no deja crear un CNAME
-    con un nombre que ya está en uso, y la cuenta queda sin "ver desde el
-    celular" para siempre hasta que alguien lo note y lo borre a mano."""
+    En teoría se llama UNA sola vez por cliente -- el resultado se guarda en
+    ClientTunnel y de ahí en más se reusa (ver routers/agent.py). En la
+    práctica, GET /tunnel (que llama el agente local al sincronizar) y GET
+    /tunnel/public (que llama CADA pestaña del navegador que tenga abierta
+    Suscripción) pueden terminar pidiendo los dos "creámelo" casi al mismo
+    tiempo si todavía no existe ningún ClientTunnel guardado -- no hay ningún
+    lock que lo evite. Cloudflare rechaza al segundo con el error 1013 ("ya
+    tenés un túnel con este nombre"). En vez de tratar eso como un error de
+    verdad, lo recuperamos: buscamos el túnel que el otro pedido ya creó y
+    seguimos con ÉSE -- así da lo mismo cuántos pedidos lleguen juntos, el
+    resultado converge siempre al mismo túnel.
+
+    También por las dudas se borra primero cualquier registro DNS viejo que
+    haya quedado huérfano de un túnel anterior (ver delete_tunnel) -- si no,
+    el paso 4 de acá abajo falla porque Cloudflare no deja crear un CNAME con
+    un nombre que ya está en uso."""
     if not is_configured():
         raise CloudflareError("Cloudflare no está configurado en el servidor (faltan variables de entorno).")
 
     hostname = f"{subdomain}.{settings.CLOUDFLARE_TUNNEL_DOMAIN}"
+    tunnel_name = f"ai-sentinel-{subdomain}"
     account_id = settings.CLOUDFLARE_ACCOUNT_ID
     zone_id = settings.CLOUDFLARE_ZONE_ID
 
@@ -106,11 +130,24 @@ def create_tunnel_for_subdomain(subdomain: str) -> dict:
     create_resp = requests.post(
         f"{API_BASE}/accounts/{account_id}/cfd_tunnel",
         headers=_headers(),
-        json={"name": f"ai-sentinel-{subdomain}", "config_src": "cloudflare"},
+        json={"name": tunnel_name, "config_src": "cloudflare"},
         timeout=15,
     )
-    tunnel = _check(create_resp, "crear el túnel")["result"]
-    tunnel_id = tunnel["id"]
+    create_data = create_resp.json()
+    if create_resp.ok and create_data.get("success"):
+        tunnel_id = create_data["result"]["id"]
+    else:
+        errors = create_data.get("errors") or []
+        already_exists = any(e.get("code") == 1013 for e in errors)
+        if not already_exists:
+            raise CloudflareError(f"Cloudflare falló al crear el túnel: {errors}")
+        found_id = _find_tunnel_id_by_name(tunnel_name)
+        if found_id is None:
+            raise CloudflareError(
+                f"Cloudflare dice que ya existe un túnel llamado '{tunnel_name}' pero no lo "
+                f"pude encontrar para reusarlo: {errors}"
+            )
+        tunnel_id = found_id
 
     # 2) Pedir el token de conector -- esto es lo que usa `cloudflared tunnel run
     # --token <token>` en la PC del cliente.
