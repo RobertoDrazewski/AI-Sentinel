@@ -189,7 +189,7 @@ def reset_tunnel(
     ).first()
     if tunnel is None:
         return {"ok": True, "deleted": False}
-    cloudflare_client.delete_tunnel(tunnel.cf_tunnel_id)
+    cloudflare_client.delete_tunnel(tunnel.cf_tunnel_id, tunnel.hostname)
     session.delete(tunnel)
     session.commit()
     return {"ok": True, "deleted": True}

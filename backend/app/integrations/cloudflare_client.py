@@ -54,18 +54,53 @@ def _check(resp: requests.Response, action: str) -> dict:
     return data
 
 
+def _find_dns_record_id(hostname: str) -> Optional[str]:
+    """Busca si ya existe un registro DNS con este nombre exacto en la zona (sin
+    importar el tipo). Cloudflare no permite un CNAME nuevo si ya hay CUALQUIER
+    otro registro con el mismo nombre -- hace falta encontrarlo primero para
+    poder borrarlo antes de crear el nuevo."""
+    zone_id = settings.CLOUDFLARE_ZONE_ID
+    resp = requests.get(
+        f"{API_BASE}/zones/{zone_id}/dns_records",
+        headers=_headers(),
+        params={"name": hostname},
+        timeout=15,
+    )
+    data = _check(resp, "buscar el registro DNS existente")
+    results = data.get("result") or []
+    return results[0]["id"] if results else None
+
+
+def _delete_dns_record_if_exists(hostname: str) -> None:
+    record_id = _find_dns_record_id(hostname)
+    if record_id is None:
+        return
+    requests.delete(
+        f"{API_BASE}/zones/{settings.CLOUDFLARE_ZONE_ID}/dns_records/{record_id}",
+        headers=_headers(),
+        timeout=15,
+    )
+
+
 def create_tunnel_for_subdomain(subdomain: str) -> dict:
     """Crea el túnel + la regla de ingreso + el registro DNS para `subdomain`
     (ej: "cliente42"). Devuelve {tunnel_id, connector_token, hostname}.
 
     Se llama UNA sola vez por cliente -- de ahí en más el resultado se guarda
-    en la tabla ClientTunnel y se reusa siempre (ver routers/agent.py)."""
+    en la tabla ClientTunnel y se reusa siempre (ver routers/agent.py). Como el
+    hostname es siempre el mismo para la misma cuenta, si quedó un registro DNS
+    huérfano de un túnel anterior (ver delete_tunnel) hay que borrarlo PRIMERO --
+    si no, el paso 4 de acá abajo falla porque Cloudflare no deja crear un CNAME
+    con un nombre que ya está en uso, y la cuenta queda sin "ver desde el
+    celular" para siempre hasta que alguien lo note y lo borre a mano."""
     if not is_configured():
         raise CloudflareError("Cloudflare no está configurado en el servidor (faltan variables de entorno).")
 
     hostname = f"{subdomain}.{settings.CLOUDFLARE_TUNNEL_DOMAIN}"
     account_id = settings.CLOUDFLARE_ACCOUNT_ID
     zone_id = settings.CLOUDFLARE_ZONE_ID
+
+    _delete_dns_record_if_exists(hostname)
 
     # 1) Crear el túnel (config administrado por Cloudflare, no por un archivo local).
     create_resp = requests.post(
@@ -120,10 +155,19 @@ def create_tunnel_for_subdomain(subdomain: str) -> dict:
     return {"tunnel_id": tunnel_id, "connector_token": connector_token, "hostname": hostname}
 
 
-def delete_tunnel(tunnel_id: str) -> None:
+def delete_tunnel(tunnel_id: str, hostname: Optional[str] = None) -> None:
     """Borra el túnel en Cloudflare. Se usa si alguna vez hay que limpiar uno roto
-    (ej: la cuenta se dio de baja). No borra el registro DNS -- eso queda huérfano
-    pero no hace daño (deja de resolver a nada funcional)."""
+    (ej: la cuenta se dio de baja, o el botón "Reiniciar túnel" en Suscripción).
+
+    Si se pasa `hostname`, también borra su registro DNS. ANTES esto se dejaba
+    huérfano a propósito ("no hace daño"), pero sí hace daño: como el hostname
+    de cada cuenta es siempre el mismo (ai-sentinel-cliente{id}...), ese
+    registro viejo le gana el nombre al que create_tunnel_for_subdomain intenta
+    crear la próxima vez, y la cuenta queda con "ver desde el celular" roto
+    para siempre (sin ningún error visible para el cliente, sólo el cartel de
+    "todavía no está disponible"). create_tunnel_for_subdomain ya se protege
+    de este caso por las dudas, pero borrarlo acá también evita dejar basura
+    dando vueltas en el panel de Cloudflare."""
     if not is_configured():
         return
     requests.delete(
@@ -131,3 +175,8 @@ def delete_tunnel(tunnel_id: str) -> None:
         headers=_headers(),
         timeout=15,
     )
+    if hostname:
+        try:
+            _delete_dns_record_if_exists(hostname)
+        except CloudflareError:
+            pass  # no es crítico -- create_tunnel_for_subdomain se cubre solo igual
